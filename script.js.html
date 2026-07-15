@@ -1,0 +1,390 @@
+// =========================================================================
+// SISTEMA DE FACTURACIÓN ATELIER WINLAB - CON LOGO, NEQ, TELÉFONO, WEB Y LOGIN
+// =========================================================================
+
+const SB_URL = 'https://rdsrdclphysffabozqxc.supabase.co';
+const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
+
+let facturaActiva = null;
+
+// FUNCIÓN DE SEGURIDAD (LOGIN)
+function verificarPassword(event) {
+    event.preventDefault();
+    const passwordInput = document.getElementById('adminPassword').value;
+    const errorMsg = document.getElementById('loginError');
+    
+    // AQUÍ PUEDES CAMBIAR TU CONTRASEÑA EN EL FUTURO
+    if (passwordInput === "Winlab2026") { 
+        document.getElementById('loginScreen').style.cssText = "display: none !important;";
+        document.getElementById('appContainer').style.display = 'block';
+    } else {
+        errorMsg.style.display = 'block';
+        document.getElementById('adminPassword').value = "";
+    }
+}
+
+// Alternar entre pestañas
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.getElementById(tabId).style.display = 'block';
+    
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    if(event && event.currentTarget) event.currentTarget.classList.add('active');
+    
+    if (tabId === 'caisse') cargarFacturesDesdeSupabase();
+}
+
+// ID único para registros
+function generarUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// DESCARGA DIRECTA PREMIUM - EXPANSIÓN FORZADA ANTES DE GENERAR PDF
+async function descargarFacturaPDF() {
+    if (!facturaActiva) return;
+    if (typeof html2pdf === 'undefined') {
+        alert("La bibliothèque PDF charge encore. Attendez 3 secondes.");
+        return;
+    }
+    
+    const elementoFactura = document.getElementById('modalCuerpoFactura');
+    const estiloOriginal = elementoFactura.style.cssText;
+    
+    // Forzamos al elemento a expandirse al 100% de su contenido real sin scrolls
+    elementoFactura.style.cssText = "position: relative; width: 100%; max-width: 680px; height: auto !important; max-height: none !important; min-height: unset !important; overflow: visible !important; display: block !important; padding: 25px; background: #ffffff; box-sizing: border-box;";
+    
+    const opcionesPdf = {
+        margin:       12, // Margen uniforme ideal en mm
+        filename:     `Facture_${facturaActiva.id_facture}.pdf`,
+        image:        { type: 'jpeg', quality: 1.0 },
+        html2canvas:  { scale: 3, useCORS: true, letterRendering: true, scrollY: 0, scrollX: 0 },
+        jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
+    };
+    
+    try {
+        await html2pdf().set(opcionesPdf).from(elementoFactura).save();
+    } catch (err) {
+        alert("Oups ! Le fichier PDF n'a pas pu être généré.");
+    } finally {
+        // Restauramos los estilos originales para la previsualización en pantalla
+        elementoFactura.style.cssText = estiloOriginal;
+    }
+}
+
+// REGISTRAR EN SUPABASE COMPATIBLE CON MÚLTIPLES ÍTEMS
+async function guardarFacturaReal(event) {
+    event.preventDefault();
+
+    const nom = document.getElementById('clientNom').value.trim();
+    const courriel = document.getElementById('clientCourriel').value.trim();
+    
+    // Recolectar todos los ítems ingresados en el formulario dinámico
+    const filas = document.querySelectorAll('.fila-reparacion');
+    let listaTrabajos = [];
+    let prixBaseTotal = 0;
+
+    filas.forEach(fila => {
+        const app = fila.querySelector('.item-appareil').value.trim();
+        const rep = fila.querySelector('.item-reparation').value.trim();
+        const precio = parseFloat(fila.querySelector('.item-precio').value) || 0;
+        
+        listaTrabajos.push({ appareil: app, reparation: rep, prix: precio });
+        prixBaseTotal += precio;
+    });
+
+    try {
+        const responseList = await fetch(`${SB_URL}/rest/v1/factures?select=id_facture`, {
+            method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+        if (!responseList.ok) throw new Error("Impossible de se connecter à Supabase.");
+        const todasLesFactures = await responseList.json();
+        
+        const totalRegistradas = todasLesFactures ? todasLesFactures.length : 0;
+        const numeroFacture = `FAC-${String(totalRegistradas + 1).padStart(4, '0')}`;
+
+        const tps = Math.round(prixBaseTotal * 0.05 * 100) / 100;
+        const tvq = Math.round(prixBaseTotal * 0.09975 * 100) / 100;
+        const total = prixBaseTotal + tps + tvq;
+
+        // Formato para guardar los nombres colapsados en columnas de Supabase
+        const resumenAppareils = listaTrabajos.map(t => t.appareil).join(' + ');
+        const resumenReparations = listaTrabajos.map(t => `${t.reparation} ($${t.prix.toFixed(2)})`).join(' | ');
+
+        const nuevaFactura = {
+            id: generarUUID(), 
+            id_facture: numeroFacture, 
+            id_ticket: "WIN-" + Math.floor(1000 + Math.random() * 9000),
+            client_nom: nom, 
+            client_courriel: courriel, 
+            appareil: resumenAppareils, 
+            reparation: resumenReparations,
+            prix_base: prixBaseTotal, 
+            tps: tps, 
+            tvq: tvq, 
+            total: total, 
+            methode_paiement: 'Interac'
+        };
+
+        const responseInsert = await fetch(`${SB_URL}/rest/v1/factures`, {
+            method: 'POST',
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(nuevaFactura)
+        });
+
+        if (!responseInsert.ok) throw new Error("Échec d'enregistrement de la facture.");
+
+        // Resetear formulario y dejar una fila vacía estándar limpia
+        document.getElementById('formFacture').reset();
+        document.getElementById('contenedorReparaciones').innerHTML = `
+            <div class="fila-reparacion" style="display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end;">
+              <div style="flex: 2; display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 12px; color: #666;">Appareil :</label>
+                <input type="text" class="item-appareil" placeholder="Ex: iPhone 13 Pro" required>
+              </div>
+              <div style="flex: 3; display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 12px; color: #666;">Type de Réparation :</label>
+                <input type="text" class="item-reparation" placeholder="Ex: Changement d'écran" required>
+              </div>
+              <div style="flex: 1.5; display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 12px; color: #666;">Prix (CAD) :</label>
+                <input type="number" class="item-precio" step="0.01" min="0" placeholder="0.00" required>
+              </div>
+              <button type="button" style="padding: 10px; background: transparent; border: none; cursor: default; width: 38px;"></button>
+            </div>
+        `;
+        
+        // Formatear para el modal de visualización
+        facturaActiva = {
+            id_facture: numeroFacture,
+            date: new Date().toLocaleDateString('fr-CA'),
+            client_nom: nom,
+            client_courriel: courriel,
+            trabajos: listaTrabajos,
+            prix_base: prixBaseTotal.toFixed(2),
+            tps: tps.toFixed(2),
+            tvq: tvq.toFixed(2),
+            total: total.toFixed(2)
+        };
+
+        mostrarFacturaEnModal(facturaActiva);
+
+    } catch (error) {
+        alert(`Erreur: ${error.message}`);
+    }
+}
+
+// INYECTAR DISEÑO TOTALMENTE COMPACTO
+function mostrarFacturaEnModal(facture) {
+    const modalCuerpo = document.getElementById('modalCuerpoFactura');
+    
+    // Si viene del historial reconstruimos las filas desde el string colapsado
+    let filasHtml = '';
+    if (facture.trabajos) {
+        facture.trabajos.forEach(t => {
+            filasHtml += `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 10px; vertical-align: top;">
+                        <strong style="color: #0f172a; font-size: 13px; display: block;">${t.appareil}</strong>
+                        <span style="color: #64748b; font-size: 11px; display: block;">${t.reparation}</span>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: #0f172a; font-size: 13px; vertical-align: top;">$${t.prix.toFixed(2)}</td>
+                </tr>`;
+        });
+    } else {
+        // Fallback clásico para facturas del historial de un solo ítem
+        filasHtml = `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 8px 10px; vertical-align: top;">
+                    <strong style="color: #0f172a; font-size: 13px; display: block;">${facture.appareil}</strong>
+                    <span style="color: #64748b; font-size: 11px; display: block;">${facture.reparation}</span>
+                </td>
+                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: #0f172a; font-size: 13px; vertical-align: top;">$${facture.prix_base}</td>
+            </tr>`;
+    }
+
+    modalCuerpo.innerHTML = `
+        <div style="position: relative; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.35; padding: 25px; background-color: #ffffff; box-sizing: border-box; width: 100%; max-width: 680px; margin: 0 auto; min-height: 480px; height: auto;">
+            
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-25deg); display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; pointer-events: none; z-index: 1; opacity: 0.035; width: 100%; text-align: center;">
+                <div style="display: flex; align-items: flex-end; line-height: 0.9; font-family: 'Arial Black', sans-serif; font-size: 80px; font-weight: 900; color: #003366; letter-spacing: -3px;">
+                    <span>W</span>
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 42px; height: 60px; margin: 0 4px 4px 4px; position: relative;">
+                        <div style="width: 26px; height: 26px; border: 7px solid #10b981; border-top-color: transparent; border-radius: 50%; position: absolute; top: 5px;"></div>
+                        <div style="width: 6px; height: 12px; background-color: #10b981; position: absolute; top: 0; border-radius: 3px;"></div>
+                        <div style="width: 18px; height: 22px; background-color: #10b981; border-radius: 3px; margin-top: auto;"></div>
+                    </div>
+                    <span>INLAB</span>
+                </div>
+                <div style="font-family: -apple-system, sans-serif; font-size: 16px; font-weight: 800; color: #334155; margin-top: 8px; text-transform: uppercase;">
+                    Cellulaires • Ordinateurs • Consoles
+                </div>
+            </div>
+
+            <div style="position: relative; z-index: 2; width: 100%;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px;">
+                    
+                    <div style="display: flex; flex-direction: column; user-select: none;">
+                        <div style="display: flex; align-items: flex-end; line-height: 0.9; font-family: 'Arial Black', Arial, sans-serif; font-size: 28px; font-weight: 900; color: #0f172a; letter-spacing: -1.2px;">
+                            <span>W</span>
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 14px; height: 24px; margin: 0 2px 1px 2px; position: relative;">
+                                <div style="width: 11px; height: 11px; border: 2.8px solid #10b981; border-top-color: transparent; border-radius: 50%; box-sizing: border-box; position: absolute; top: 1px;"></div>
+                                <div style="width: 2.8px; height: 5px; background-color: #10b981; position: absolute; top: 0; border-radius: 1px;"></div>
+                                <div style="width: 8px; height: 9px; background-color: #10b981; border-radius: 1px; margin-top: auto;"></div>
+                            </div>
+                            <span>INLAB</span>
+                        </div>
+                        <div style="font-size: 8px; font-weight: 700; color: #64748b; margin-top: 3px; letter-spacing: 0.5px; text-transform: uppercase;">
+                            Cellulaires • Ordinateurs • Consoles
+                        </div>
+                    </div>
+
+                    <div style="text-align: right; font-size: 9.5px; line-height: 1.35; color: #334155;">
+                        <strong style="color: #0f172a; font-size: 11.5px;">Atelier Winlab</strong><br>
+                        Waterloo, QC, Canada<br>
+                        Tél : (450) 209-7144<br>
+                        NEQ : 020200129850961<br>
+                        <span style="color: #64748b; font-size: 8.5px; display: block; margin-top: 1px;">
+                            TPS: 739056695 RT0001 | TVQ: 4008978901 TQ0002
+                        </span>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 12px; font-size: 11px; display: flex; justify-content: space-between; background: #f8fafc; padding: 6px 10px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                    <div><strong>Facture N°:</strong> ${facture.id_facture}<br><strong>Date:</strong> ${facture.date}</div>
+                    <div style="text-align: right;"><strong>Client:</strong> ${facture.client_nom}<br><strong>Courriel:</strong> ${facture.client_courriel}</div>
+                </div>
+                
+                <table style="width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 11.5px;">
+                    <thead>
+                        <tr style="background: #0f172a; color: #ffffff;">
+                            <th style="padding: 4px 10px; text-align: left; font-weight: 600;">Description de la réparation</th>
+                            <th style="padding: 4px 10px; text-align: right; font-weight: 600;">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filasHtml}
+                    </tbody>
+                </table>
+                
+                <div style="margin-top: 10px; width: 220px; float: right; font-size: 11px; line-height: 1.4; margin-bottom: 5px; position: relative; z-index: 5;">
+                    <div style="display: flex; justify-content: space-between; color: #334155; padding: 1px 0;"><span>Sous-total:</span> <span style="font-weight: 600;">$${facture.prix_base}</span></div>
+                    <div style="display: flex; justify-content: space-between; color: #475569; padding: 1px 0;"><span>TPS (5%):</span> <span>$${facture.tps}</span></div>
+                    <div style="display: flex; justify-content: space-between; color: #475569; padding: 1px 0;"><span>TVQ (9.975%):</span> <span>$${facture.tvq}</span></div>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; border-top: 2px solid #0f172a; font-size: 13.5px; margin-top: 3px; padding-top: 3px; color: #0f172a;">
+                        <span>Total:</span> <span>$${facture.total} CAD</span>
+                    </div>
+                </div>
+                <div style="clear: both;"></div>
+
+                <div style="position: relative; z-index: 99; margin-top: 25px; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 15px; display: block; clear: both; width: 100%;">
+                    <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; font-style: italic;">
+                        Merci de votre confiance !
+                    </div>
+                    <div style="font-size: 11px; font-weight: 700; color: #007bff; margin-top: 2px; letter-spacing: 0.5px;">
+                        www.winlab.ca
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('modalFactura').style.display = 'flex';
+}
+
+// HISTORIAL DESDE SUPABASE
+function cargarFacturesDesdeSupabase() {
+    const tbody = document.getElementById('listaFacturesBody');
+    if(!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;">Chargement...</td></tr>';
+    
+    fetch(`${SB_URL}/rest/v1/factures?select=*`, {
+        method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    })
+    .then(r => r.json())
+    .then(factures => {
+        tbody.innerHTML = ''; 
+        let suma = 0;
+        
+        factures.sort((a,b)=>b.id_facture.localeCompare(a.id_facture)).forEach(fac => {
+            const base = parseFloat(fac.prix_base) || 0;
+            const tps = parseFloat(fac.tps) || 0;
+            const tvq = parseFloat(fac.tvq) || 0;
+            const total = parseFloat(fac.total) || (base + tps + tvq);
+            
+            suma += total;
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:12px; font-weight:bold;">${fac.id_facture}</td>
+                <td style="padding:12px;">${fac.client_nom}</td>
+                <td style="padding:12px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><small><b>${fac.appareil}</b><br>${fac.reparation}</small></td>
+                <td style="text-align:right; padding:12px;">$${base.toFixed(2)}</td>
+                <td style="text-align:right; padding:12px;">$${tps.toFixed(2)}</td>
+                <td style="text-align:right; padding:12px;">$${tvq.toFixed(2)}</td>
+                <td style="text-align:right; padding:12px; font-weight:bold; color:green;">$${total.toFixed(2)}</td>
+                <td style="text-align:center;">
+                    <button style="padding: 4px 8px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick='reimprimirFactureDesdeDatos(${JSON.stringify(fac)})'>Voir</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('totalCaisseDia').innerText = `$${suma.toFixed(2)} CAD`;
+        document.getElementById('totalFacturesContador').innerText = factures.length;
+    });
+}
+
+function reimprimirFactureDesdeDatos(fac) {
+    const base = parseFloat(fac.prix_base) || 0;
+    const tps = parseFloat(fac.tps) || 0;
+    const tvq = parseFloat(fac.tvq) || 0;
+    const total = parseFloat(fac.total) || (base + tps + tvq);
+
+    // Reconstruimos el listado de ítems
+    let listaTrabajosReconstruida = [];
+    if (fac.reparation && fac.reparation.includes('|')) {
+        const apps = fac.appareil.split(' + ');
+        const reps = fac.reparation.split(' | ');
+        apps.forEach((app, i) => {
+            const repTexto = reps[i] || "";
+            let precioItem = base / apps.length; 
+            if (repTexto.includes('$')) {
+                const extraerPrecio = repTexto.match(/\$(\d+\.\d+)/);
+                if (extraerPrecio) precioItem = parseFloat(extraerPrecio[1]);
+            }
+            listaTrabajosReconstruida.push({
+                appareil: app,
+                reparation: repTexto.split(' (')[0],
+                prix: precioItem
+            });
+        });
+    }
+
+    const facturaFormateada = {
+        ...fac, 
+        trabajos: listaTrabajosReconstruida.length ? listaTrabajosReconstruida : null,
+        prix_base: base.toFixed(2), 
+        tps: tps.toFixed(2), 
+        tvq: tvq.toFixed(2), 
+        total: total.toFixed(2), 
+        date: new Date(fac.created_at || Date.now()).toLocaleDateString('fr-CA')
+    };
+    facturaActiva = facturaFormateada;
+    mostrarFacturaEnModal(facturaFormateada);
+}
+
+// Cerrar el modal
+function cerrarModal() { 
+    document.getElementById('modalFactura').style.display = 'none'; 
+}
+
+// Imprimir
+function imprimirContenidoModal() { 
+    const c = document.getElementById('modalCuerpoFactura').innerHTML; 
+    const w = window.open('', '_blank'); 
+    w.document.write(`<html><body>${c}</body></html>`); 
+    w.document.close();
+    setTimeout(() => { w.print(); w.close(); }, 500);
+}
