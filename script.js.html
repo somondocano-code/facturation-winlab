@@ -1,5 +1,5 @@
 // =========================================================================
-// SISTEMA DE CONFIGURACIÓN ATELIER WINLAB - FACTURACIÓN E INVENTARIO
+// SISTEMA DE CONFIGURACIÓN ATELIER WINLAB - FACTURACIÓN E INVENTARIO COLECTIVO
 // =========================================================================
 
 const SB_URL = 'https://rdsrdclphysffabozqxc.supabase.co';
@@ -17,10 +17,17 @@ function verificarPassword(event) {
     if (passwordInput === "Winlab2026") { 
         document.getElementById('loginScreen').style.cssText = "display: none !important;";
         document.getElementById('appContainer').style.display = 'block';
+        inicializarSistema();
     } else {
         errorMsg.style.display = 'block';
         document.getElementById('adminPassword').value = "";
     }
+}
+
+// Al desbloquear, cargamos primero el inventario para poder usarlo en las facturas
+async function inicializarSistema() {
+    await cargarInventarioDesdeSupabase();
+    reestablecerFormularioFactura();
 }
 
 // Alternar entre pestañas
@@ -72,7 +79,84 @@ async function descargarFacturaPDF() {
     }
 }
 
-// GUARDAR FACTURA REAL EN SUPABASE (COMPATIBLE CON TU TABLA SIN TELÉFONO)
+// RESTABLECER FORMULARIO CON SELECCIÓN DE INVENTARIO
+function reestablecerFormularioFactura() {
+    document.getElementById('formFacture').reset();
+    const contenedor = document.getElementById('contenedorReparaciones');
+    contenedor.innerHTML = '';
+    agregarFilaReparacion(); // Agrega la primera fila limpia
+}
+
+// AGREGAR FILA DINÁMICA DE REPARACIÓN (CON SELECTOR DE INVENTARIO)
+function agregarFilaReparacion() {
+    const contenedor = document.getElementById('contenedorReparaciones');
+    const index = contenedor.children.length;
+    
+    const nuevaFila = document.createElement('div');
+    nuevaFila.className = 'fila-reparacion';
+    nuevaFila.style = "display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; flex-wrap: wrap;";
+    
+    // Generar opciones del inventario
+    let opcionesInventario = `<option value="service" data-precio="0">🛠️ Service / Main d'œuvre (Manuel)</option>`;
+    inventarioLocal.forEach(item => {
+        const stock = parseInt(item.quantite_stock) || 0;
+        if(stock > 0) {
+            opcionesInventario += `<option value="${item.id}" data-precio="${item.prix_vente}">${item.nom_piece} (Stock: ${stock} | $${parseFloat(item.prix_vente).toFixed(2)})</option>`;
+        }
+    });
+
+    nuevaFila.innerHTML = `
+        <div style="flex: 2; min-width: 150px; display: flex; flex-direction: column; gap: 5px;">
+            <label style="font-size: 12px; color: #666;">Appareil :</label>
+            <input type="text" class="item-appareil" placeholder="Ex: iPhone 13 Pro" required>
+        </div>
+        <div style="flex: 3; min-width: 200px; display: flex; flex-direction: column; gap: 5px;">
+            <label style="font-size: 12px; color: #666;">Type de Réparation / Pièce :</label>
+            <select class="item-selector-pieza" onchange="cambiarSeleccionPieza(this)" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; background-color: #f8fafc; height: 46px;">
+                ${opcionesInventario}
+            </select>
+            <!-- Entrada de texto manual para cuando se selecciona "Service" -->
+            <input type="text" class="item-reparation" placeholder="Ex: Changement d'écran" style="margin-top: 5px;" required>
+        </div>
+        <div style="flex: 1.5; min-width: 100px; display: flex; flex-direction: column; gap: 5px;">
+            <label style="font-size: 12px; color: #666;">Prix (CAD) :</label>
+            <input type="number" class="item-precio" step="0.01" min="0" placeholder="0.00" required>
+        </div>
+        ${index > 0 ? `<button type="button" style="padding: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 38px; font-weight: bold; height: 46px;" onclick="eliminarFilaReparacion(this)">✕</button>` : `<button type="button" style="padding: 10px; background: transparent; border: none; cursor: default; width: 38px; height: 46px;"></button>`}
+    `;
+    
+    contenedor.appendChild(nuevaFila);
+}
+
+function eliminarFilaReparacion(boton) {
+    boton.parentElement.remove();
+}
+
+// AL CAMBIAR LA PIEZA SE AUTOCOMPLETA EL PRECIO Y EL NOMBRE
+function cambiarSeleccionPieza(selectElement) {
+    const fila = selectElement.parentElement.parentElement;
+    const opcionSeleccionada = selectElement.options[selectElement.selectedIndex];
+    const precio = parseFloat(opcionSeleccionada.getAttribute('data-precio')) || 0;
+    
+    const inputReparacion = fila.querySelector('.item-reparation');
+    const inputPrecio = fila.querySelector('.item-precio');
+    
+    if (selectElement.value === 'service') {
+        inputReparacion.value = '';
+        inputReparacion.style.display = 'block';
+        inputPrecio.value = '';
+        inputPrecio.readOnly = false;
+    } else {
+        // Autocompletamos con la información registrada en el inventario
+        const nombrePiezaClean = opcionSeleccionada.text.split(' (Stock:')[0];
+        inputReparacion.value = nombrePiezaClean;
+        inputReparacion.style.display = 'none'; // Ocultamos el campo manual para evitar que se altere
+        inputPrecio.value = precio.toFixed(2);
+        inputPrecio.readOnly = true; // No modificable si es un repuesto exacto
+    }
+}
+
+// GUARDAR FACTURA REAL EN SUPABASE (Y DISMINUIR STOCK SI APLICA)
 async function guardarFacturaReal(event) {
     event.preventDefault();
 
@@ -82,17 +166,36 @@ async function guardarFacturaReal(event) {
     const filas = document.querySelectorAll('.fila-reparacion');
     let listaTrabajos = [];
     let prixBaseTotal = 0;
+    let piezasADescontar = []; // Registro de id_pieza y nueva cantidad
 
-    filas.forEach(fila => {
+    for (let fila of filas) {
         const app = fila.querySelector('.item-appareil').value.trim();
         const rep = fila.querySelector('.item-reparation').value.trim();
         const precio = parseFloat(fila.querySelector('.item-precio').value) || 0;
+        const selectorPieza = fila.querySelector('.item-selector-pieza').value;
         
         listaTrabajos.push({ appareil: app, reparation: rep, prix: precio });
         prixBaseTotal += precio;
-    });
+
+        // Si se seleccionó una pieza real del inventario, programamos su descuento
+        if (selectorPieza !== 'service') {
+            const piezaInv = inventarioLocal.find(item => String(item.id) === String(selectorPieza));
+            if (piezaInv) {
+                const stockActual = parseInt(piezaInv.quantite_stock) || 0;
+                if (stockActual <= 0) {
+                    alert(`Erreur: La pièce "${piezaInv.nom_piece}" n'a plus de stock disponible!`);
+                    return;
+                }
+                piezasADescontar.push({
+                    id: selectorPieza,
+                    nuevoStock: stockActual - 1
+                });
+            }
+        }
+    }
 
     try {
+        // 1. Registrar la Factura en Supabase
         const responseList = await fetch(`${SB_URL}/rest/v1/factures?select=id_facture`, {
             method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
@@ -109,7 +212,6 @@ async function guardarFacturaReal(event) {
         const resumenAppareils = listaTrabajos.map(t => t.appareil).join(' + ');
         const resumenReparations = listaTrabajos.map(t => `${t.reparation} ($${t.prix.toFixed(2)})`).join(' | ');
 
-        // Guardamos sin la columna "telefono" que no existe en tu tabla de facturas
         const nuevaFactura = {
             id: generarUUID(), 
             id_facture: numeroFacture, 
@@ -133,24 +235,22 @@ async function guardarFacturaReal(event) {
 
         if (!responseInsert.ok) throw new Error("Échec d'enregistrement de la facture.");
 
-        document.getElementById('formFacture').reset();
-        document.getElementById('contenedorReparaciones').innerHTML = `
-            <div class="fila-reparacion" style="display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end;">
-              <div style="flex: 2; display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; color: #666;">Appareil :</label>
-                <input type="text" class="item-appareil" placeholder="Ex: iPhone 13 Pro" required>
-              </div>
-              <div style="flex: 3; display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; color: #666;">Type de Réparation :</label>
-                <input type="text" class="item-reparation" placeholder="Ex: Changement d'écran" required>
-              </div>
-              <div style="flex: 1.5; display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; color: #666;">Prix (CAD) :</label>
-                <input type="number" class="item-precio" step="0.01" min="0" placeholder="0.00" required>
-              </div>
-              <button type="button" style="padding: 10px; background: transparent; border: none; cursor: default; width: 38px;"></button>
-            </div>
-        `;
+        // 2. Procesar todos los descuentos de Inventario en lote
+        for (let desc of piezasADescontar) {
+            await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${desc.id}`, {
+                method: 'PATCH',
+                headers: { 
+                    'apikey': SB_KEY, 
+                    'Authorization': `Bearer ${SB_KEY}`, 
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ quantite_stock: desc.nuevoStock })
+            });
+        }
+
+        // 3. Refrescar inventario local y reiniciar formulario
+        await cargarInventarioDesdeSupabase();
+        reestablecerFormularioFactura();
         
         facturaActiva = {
             id_facture: numeroFacture,
@@ -257,7 +357,7 @@ function mostrarFacturaEnModal(facture) {
                 </div>
                 <div style="clear: both;"></div>
                 <div style="position: relative; z-index: 99; margin-top: 25px; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 15px; display: block; clear: both; width: 100%;">
-                    <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; font-style: italic;">Merci de votre confianza !</div>
+                    <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; font-style: italic;">Merci de votre confiance !</div>
                     <div style="font-size: 11px; font-weight: 700; color: #007bff; margin-top: 2px; letter-spacing: 0.5px;">www.winlab.ca</div>
                 </div>
             </div>
@@ -344,29 +444,25 @@ function reimprimirFactureDesdeDatos(fac) {
 
 
 // =========================================================================
-// LÓGICA DE INVENTARIO
+// LÓGICA DE INVENTARIO (CONECTADA A LAS COLUMNAS EXISTENTES DE SUPABASE)
 // =========================================================================
 
-function cargarInventarioDesdeSupabase() {
-    const tbody = document.getElementById('listaInventarioBody');
-    if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">Chargement de l\'inventaire...</td></tr>';
-    
-    fetch(`${SB_URL}/rest/v1/inventaire?select=*`, {
-        method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-    })
-    .then(r => r.json())
-    .then(data => {
+async function cargarInventarioDesdeSupabase() {
+    try {
+        const r = await fetch(`${SB_URL}/rest/v1/inventaire?select=*`, {
+            method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+        const data = await r.json();
         inventarioLocal = data || [];
         renderizarTablaInventario(inventarioLocal);
-    })
-    .catch(err => {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">Erreur de chargement: ${err.message}</td></tr>`;
-    });
+    } catch (err) {
+        console.error("Erreur de chargement d'inventaire:", err);
+    }
 }
 
 function renderizarTablaInventario(lista) {
     const tbody = document.getElementById('listaInventarioBody');
+    if(!tbody) return;
     tbody.innerHTML = '';
     
     if(lista.length === 0) {
@@ -434,7 +530,8 @@ async function guardarInventarioReal(event) {
         if (!response.ok) throw new Error("Erreur d'insertion dans Supabase.");
 
         document.getElementById('formInventaire').reset();
-        cargarInventarioDesdeSupabase();
+        await cargarInventarioDesdeSupabase();
+        reestablecerFormularioFactura(); // Refresca las opciones en el formulario de factura
     } catch (err) {
         alert(`Erreur: ${err.message}`);
     }
@@ -459,7 +556,8 @@ async function modificarStock(id, cantidadCambio) {
 
         if (!response.ok) throw new Error("Impossible de mettre à jour le stock.");
         
-        cargarInventarioDesdeSupabase();
+        await cargarInventarioDesdeSupabase();
+        reestablecerFormularioFactura(); // Mantiene sincronizada la pestaña de facturación
     } catch (err) {
         alert(`Erreur: ${err.message}`);
     }
@@ -477,7 +575,8 @@ async function eliminarPiezaInventario(id, nombre) {
 
         if (!response.ok) throw new Error("Erreur lors de la suppression de la pièce.");
         
-        cargarInventarioDesdeSupabase();
+        await cargarInventarioDesdeSupabase();
+        reestablecerFormularioFactura();
     } catch (err) {
         alert(`Erreur: ${err.message}`);
     }
