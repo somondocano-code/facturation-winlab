@@ -110,12 +110,13 @@ async function guardarFacturaReal(event) {
         const resumenAppareils = listaTrabajos.map(t => t.appareil).join(' + ');
         const resumenReparations = listaTrabajos.map(t => `${t.reparation} ($${t.prix.toFixed(2)})`).join(' | ');
 
+        // Guardamos usando "client_courriel" y "telefono" que son los nombres mapeados en tu Supabase
         const nuevaFactura = {
             id: generarUUID(), 
             id_facture: numeroFacture, 
             id_ticket: "WIN-" + Math.floor(1000 + Math.random() * 9000),
             client_nom: nom, 
-            correo: courriel,
+            client_courriel: courriel, // Modificado de 'correo' a 'client_courriel' para coincidir con tu BD original
             telefono: telefono,
             appareil: resumenAppareils, 
             reparation: resumenReparations,
@@ -289,6 +290,9 @@ function cargarFacturesDesdeSupabase() {
             const total = parseFloat(fac.total) || (base + tps + tvq);
             suma += total;
             
+            // Ajustado para leer 'client_courriel' o 'correo' según lo que devuelva Supabase
+            const correoCliente = fac.client_courriel || fac.correo || 'N/A';
+            
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding:12px; font-weight:bold;">${fac.id_facture}</td>
@@ -397,7 +401,6 @@ function renderizarTablaInventario(lista) {
         const costo = parseFloat(item.prix_cout) || 0;
         const venta = parseFloat(item.prix_vente) || 0;
         
-        // Alerta visual: si el stock es menor o igual al mínimo, se pinta la fila con un fondo rojo suave
         const alertaEstilo = stock <= min ? 'background-color: #fef2f2; color: #991b1b;' : '';
         const badgeAlerta = stock <= min ? '<span style="background: #fca5a5; color: #7f1d1d; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px;">BAS</span>' : '';
 
@@ -420,7 +423,7 @@ function renderizarTablaInventario(lista) {
     });
 }
 
-// GUARDAR NUEVA PIEZA EN SUPABASE (Asegura compatibilidad con tu ID autonumérico o bigint)
+// GUARDAR NUEVA PIEZA EN SUPABASE
 async function guardarInventarioReal(event) {
     event.preventDefault();
     
@@ -459,7 +462,7 @@ async function guardarInventarioReal(event) {
     }
 }
 
-// MODIFICAR STOCK (Aumentar o disminuir de uno en uno con un solo clic)
+// MODIFICAR STOCK
 async function modificarStock(id, cantidadCambio) {
     const pieza = inventarioLocal.find(item => String(item.id) === String(id));
     if(!pieza) return;
@@ -504,7 +507,7 @@ async function eliminarPiezaInventario(id, nombre) {
     }
 }
 
-// FILTRAR INVENTARIO EN VIVO (Buscador)
+// FILTRAR INVENTARIO EN VIVO
 function filtrarInventario() {
     const query = document.getElementById('buscadorInventario').value.toLowerCase().trim();
     if(!query) {
