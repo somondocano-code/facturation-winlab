@@ -1,11 +1,12 @@
 // =========================================================================
-// SISTEMA DE FACTURACIÓN ATELIER WINLAB - CON LOGO, TELÉFONO, WEB Y LOGIN
+// SISTEMA DE CONFIGURACIÓN ATELIER WINLAB - FACTURACIÓN E INVENTARIO
 // =========================================================================
 
 const SB_URL = 'https://rdsrdclphysffabozqxc.supabase.co';
 const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
 
 let facturaActiva = null;
+let inventarioLocal = []; // Almacén temporal para búsquedas rápidas
 
 // FUNCIÓN DE SEGURIDAD (LOGIN)
 function verificarPassword(event) {
@@ -13,7 +14,6 @@ function verificarPassword(event) {
     const passwordInput = document.getElementById('adminPassword').value;
     const errorMsg = document.getElementById('loginError');
     
-    // AQUÍ PUEDES CAMBIAR TU CONTRASEÑA EN EL FUTURO
     if (passwordInput === "Winlab2026") { 
         document.getElementById('loginScreen').style.cssText = "display: none !important;";
         document.getElementById('appContainer').style.display = 'block';
@@ -32,6 +32,7 @@ function switchTab(tabId) {
     if(event && event.currentTarget) event.currentTarget.classList.add('active');
     
     if (tabId === 'caisse') cargarFacturesDesdeSupabase();
+    if (tabId === 'inventarioTab') cargarInventarioDesdeSupabase();
 }
 
 // ID único para registros
@@ -42,7 +43,7 @@ function generarUUID() {
     });
 }
 
-// DESCARGA DIRECTA PREMIUM - EXPANSIÓN FORZADA ANTES DE GENERAR PDF
+// GENERAR PDF DE FACTURA
 async function descargarFacturaPDF() {
     if (!facturaActiva) return;
     if (typeof html2pdf === 'undefined') {
@@ -52,12 +53,10 @@ async function descargarFacturaPDF() {
     
     const elementoFactura = document.getElementById('modalCuerpoFactura');
     const estiloOriginal = elementoFactura.style.cssText;
-    
-    // Forzamos al elemento a expandirse al 100% de su contenido real sin scrolls
     elementoFactura.style.cssText = "position: relative; width: 100%; max-width: 680px; height: auto !important; max-height: none !important; min-height: unset !important; overflow: visible !important; display: block !important; padding: 25px; background: #ffffff; box-sizing: border-box;";
     
     const opcionesPdf = {
-        margin:       12, // Margen uniforme ideal en mm
+        margin:       12,
         filename:     `Facture_${facturaActiva.id_facture}.pdf`,
         image:        { type: 'jpeg', quality: 1.0 },
         html2canvas:  { scale: 3, useCORS: true, letterRendering: true, scrollY: 0, scrollX: 0 },
@@ -69,19 +68,18 @@ async function descargarFacturaPDF() {
     } catch (err) {
         alert("Oups ! Le fichier PDF n'a pas pu être généré.");
     } finally {
-        // Restauramos los estilos originales para la previsualización en pantalla
         elementoFactura.style.cssText = estiloOriginal;
     }
 }
 
-// REGISTRAR EN SUPABASE COMPATIBLE CON MÚLTIPLES ÍTEMS
+// GUARDAR FACTURA REAL EN SUPABASE
 async function guardarFacturaReal(event) {
     event.preventDefault();
 
     const nom = document.getElementById('clientNom').value.trim();
     const courriel = document.getElementById('clientCourriel').value.trim();
+    const telefono = document.getElementById('clientTelephone').value.trim();
     
-    // Recolectar todos los ítems ingresados en el formulario dinámico
     const filas = document.querySelectorAll('.fila-reparacion');
     let listaTrabajos = [];
     let prixBaseTotal = 0;
@@ -109,7 +107,6 @@ async function guardarFacturaReal(event) {
         const tvq = Math.round(prixBaseTotal * 0.09975 * 100) / 100;
         const total = prixBaseTotal + tps + tvq;
 
-        // Formato para guardar los nombres colapsados en columnas de Supabase
         const resumenAppareils = listaTrabajos.map(t => t.appareil).join(' + ');
         const resumenReparations = listaTrabajos.map(t => `${t.reparation} ($${t.prix.toFixed(2)})`).join(' | ');
 
@@ -118,7 +115,8 @@ async function guardarFacturaReal(event) {
             id_facture: numeroFacture, 
             id_ticket: "WIN-" + Math.floor(1000 + Math.random() * 9000),
             client_nom: nom, 
-            client_courriel: courriel, 
+            correo: courriel,
+            telefono: telefono,
             appareil: resumenAppareils, 
             reparation: resumenReparations,
             prix_base: prixBaseTotal, 
@@ -136,7 +134,6 @@ async function guardarFacturaReal(event) {
 
         if (!responseInsert.ok) throw new Error("Échec d'enregistrement de la facture.");
 
-        // Resetear formulario y dejar una fila vacía estándar limpia
         document.getElementById('formFacture').reset();
         document.getElementById('contenedorReparaciones').innerHTML = `
             <div class="fila-reparacion" style="display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end;">
@@ -156,12 +153,12 @@ async function guardarFacturaReal(event) {
             </div>
         `;
         
-        // Formatear para el modal de visualización
         facturaActiva = {
             id_facture: numeroFacture,
             date: new Date().toLocaleDateString('fr-CA'),
             client_nom: nom,
             client_courriel: courriel,
+            client_telephone: telefono,
             trabajos: listaTrabajos,
             prix_base: prixBaseTotal.toFixed(2),
             tps: tps.toFixed(2),
@@ -176,11 +173,9 @@ async function guardarFacturaReal(event) {
     }
 }
 
-// INYECTAR DISEÑO TOTALMENTE COMPACTO (NEQ REMOVIDO)
+// INJECTAR DISEÑO DE FACTURA (NEQ REMOVIDO)
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
-    
-    // Si viene del historial reconstruimos las filas desde el string colapsado
     let filasHtml = '';
     if (facture.trabajos) {
         facture.trabajos.forEach(t => {
@@ -194,7 +189,6 @@ function mostrarFacturaEnModal(facture) {
                 </tr>`;
         });
     } else {
-        // Fallback clásico para facturas del historial de un solo ítem
         filasHtml = `
             <tr style="border-bottom: 1px solid #e2e8f0;">
                 <td style="padding: 8px 10px; vertical-align: top;">
@@ -207,7 +201,6 @@ function mostrarFacturaEnModal(facture) {
 
     modalCuerpo.innerHTML = `
         <div style="position: relative; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.35; padding: 25px; background-color: #ffffff; box-sizing: border-box; width: 100%; max-width: 680px; margin: 0 auto; min-height: 480px; height: auto;">
-            
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-25deg); display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; pointer-events: none; z-index: 1; opacity: 0.035; width: 100%; text-align: center;">
                 <div style="display: flex; align-items: flex-end; line-height: 0.9; font-family: 'Arial Black', sans-serif; font-size: 80px; font-weight: 900; color: #003366; letter-spacing: -3px;">
                     <span>W</span>
@@ -218,15 +211,10 @@ function mostrarFacturaEnModal(facture) {
                     </div>
                     <span>INLAB</span>
                 </div>
-                <div style="font-family: -apple-system, sans-serif; font-size: 16px; font-weight: 800; color: #334155; margin-top: 8px; text-transform: uppercase;">
-                    Cellulaires • Ordinateurs • Consoles
-                </div>
+                <div style="font-family: -apple-system, sans-serif; font-size: 16px; font-weight: 800; color: #334155; margin-top: 8px; text-transform: uppercase;">Cellulaires • Ordinateurs • Consoles</div>
             </div>
-
             <div style="position: relative; z-index: 2; width: 100%;">
-                
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px;">
-                    
                     <div style="display: flex; flex-direction: column; user-select: none;">
                         <div style="display: flex; align-items: flex-end; line-height: 0.9; font-family: 'Arial Black', Arial, sans-serif; font-size: 28px; font-weight: 900; color: #0f172a; letter-spacing: -1.2px;">
                             <span>W</span>
@@ -237,11 +225,8 @@ function mostrarFacturaEnModal(facture) {
                             </div>
                             <span>INLAB</span>
                         </div>
-                        <div style="font-size: 8px; font-weight: 700; color: #64748b; margin-top: 3px; letter-spacing: 0.5px; text-transform: uppercase;">
-                            Cellulaires • Ordinateurs • Consoles
-                        </div>
+                        <div style="font-size: 8px; font-weight: 700; color: #64748b; margin-top: 3px; letter-spacing: 0.5px; text-transform: uppercase;">Cellulaires • Ordinateurs • Consoles</div>
                     </div>
-
                     <div style="text-align: right; font-size: 9.5px; line-height: 1.35; color: #334155;">
                         <strong style="color: #0f172a; font-size: 11.5px;">Atelier Winlab</strong><br>
                         Waterloo, QC, Canada<br>
@@ -251,12 +236,10 @@ function mostrarFacturaEnModal(facture) {
                         </span>
                     </div>
                 </div>
-                
                 <div style="margin-bottom: 12px; font-size: 11px; display: flex; justify-content: space-between; background: #f8fafc; padding: 6px 10px; border-radius: 4px; border: 1px solid #e2e8f0;">
                     <div><strong>Facture N°:</strong> ${facture.id_facture}<br><strong>Date:</strong> ${facture.date}</div>
-                    <div style="text-align: right;"><strong>Client:</strong> ${facture.client_nom}<br><strong>Courriel:</strong> ${facture.client_courriel}</div>
+                    <div style="text-align: right;"><strong>Client:</strong> ${facture.client_nom}<br><strong>Courriel:</strong> ${facture.client_courriel || facture.correo}</div>
                 </div>
-                
                 <table style="width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 11.5px;">
                     <thead>
                         <tr style="background: #0f172a; color: #ffffff;">
@@ -264,11 +247,8 @@ function mostrarFacturaEnModal(facture) {
                             <th style="padding: 4px 10px; text-align: right; font-weight: 600;">Montant</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${filasHtml}
-                    </tbody>
+                    <tbody>${filasHtml}</tbody>
                 </table>
-                
                 <div style="margin-top: 10px; width: 220px; float: right; font-size: 11px; line-height: 1.4; margin-bottom: 5px; position: relative; z-index: 5;">
                     <div style="display: flex; justify-content: space-between; color: #334155; padding: 1px 0;"><span>Sous-total:</span> <span style="font-weight: 600;">$${facture.prix_base}</span></div>
                     <div style="display: flex; justify-content: space-between; color: #475569; padding: 1px 0;"><span>TPS (5%):</span> <span>$${facture.tps}</span></div>
@@ -278,14 +258,9 @@ function mostrarFacturaEnModal(facture) {
                     </div>
                 </div>
                 <div style="clear: both;"></div>
-
                 <div style="position: relative; z-index: 99; margin-top: 25px; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 15px; display: block; clear: both; width: 100%;">
-                    <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; font-style: italic;">
-                        Merci de votre confiance !
-                    </div>
-                    <div style="font-size: 11px; font-weight: 700; color: #007bff; margin-top: 2px; letter-spacing: 0.5px;">
-                        www.winlab.ca
-                    </div>
+                    <div style="font-size: 12.5px; font-weight: 600; color: #0f172a; font-style: italic;">Merci de votre confiance !</div>
+                    <div style="font-size: 11px; font-weight: 700; color: #007bff; margin-top: 2px; letter-spacing: 0.5px;">www.winlab.ca</div>
                 </div>
             </div>
         </div>
@@ -293,11 +268,11 @@ function mostrarFacturaEnModal(facture) {
     document.getElementById('modalFactura').style.display = 'flex';
 }
 
-// HISTORIAL DESDE SUPABASE
+// CARGAR HISTORIAL DE FACTURAS
 function cargarFacturesDesdeSupabase() {
     const tbody = document.getElementById('listaFacturesBody');
     if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;">Chargement...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">Chargement...</td></tr>';
     
     fetch(`${SB_URL}/rest/v1/factures?select=*`, {
         method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
@@ -312,20 +287,18 @@ function cargarFacturesDesdeSupabase() {
             const tps = parseFloat(fac.tps) || 0;
             const tvq = parseFloat(fac.tvq) || 0;
             const total = parseFloat(fac.total) || (base + tps + tvq);
-            
             suma += total;
             
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="padding:12px; font-weight:bold;">${fac.id_facture}</td>
                 <td style="padding:12px;">${fac.client_nom}</td>
+                <td style="padding:12px;">${fac.telefono || 'N/A'}</td>
                 <td style="padding:12px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><small><b>${fac.appareil}</b><br>${fac.reparation}</small></td>
-                <td style="text-align:right; padding:12px;">$${base.toFixed(2)}</td>
-                <td style="text-align:right; padding:12px;">$${tps.toFixed(2)}</td>
-                <td style="text-align:right; padding:12px;">$${tvq.toFixed(2)}</td>
                 <td style="text-align:right; padding:12px; font-weight:bold; color:green;">$${total.toFixed(2)}</td>
                 <td style="text-align:center;">
                     <button style="padding: 4px 8px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick='reimprimirFactureDesdeDatos(${JSON.stringify(fac)})'>Voir</button>
+                    <button style="padding: 4px 8px; background: #25d366; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="enviarSMSAviso('${fac.client_nom}', '${fac.telefono}', '${fac.appareil}', '${total.toFixed(2)}')">💬 SMS</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -335,13 +308,23 @@ function cargarFacturesDesdeSupabase() {
     });
 }
 
+// ENVIAR AVISO SMS TEMPORAL
+async function enviarSMSAviso(nombre, telefono, aparato, total) {
+    if(!telefono || telefono === 'N/A') {
+        alert("Ce client n'a pas de numéro de téléphone enregistré.");
+        return;
+    }
+    const confirmar = confirm(`Voulez-vous envoyer un SMS à ${nombre} (${telefono})?`);
+    if(!confirmar) return;
+    alert("Envoi en cours... (Le service sera opérationnel dès approbation de Twilio !)");
+}
+
 function reimprimirFactureDesdeDatos(fac) {
     const base = parseFloat(fac.prix_base) || 0;
     const tps = parseFloat(fac.tps) || 0;
     const tvq = parseFloat(fac.tvq) || 0;
     const total = parseFloat(fac.total) || (base + tps + tvq);
 
-    // Reconstruimos el listado de ítems
     let listaTrabajosReconstruida = [];
     if (fac.reparation && fac.reparation.includes('|')) {
         const apps = fac.appareil.split(' + ');
@@ -374,12 +357,174 @@ function reimprimirFactureDesdeDatos(fac) {
     mostrarFacturaEnModal(facturaFormateada);
 }
 
-// Cerrar el modal
+
+// =========================================================================
+// LÓGICA DE INVENTARIO (CONECTADA A LAS COLUMNAS EXISTENTES DE SUPABASE)
+// =========================================================================
+
+// CARGAR INVENTARIO DESDE SUPABASE
+function cargarInventarioDesdeSupabase() {
+    const tbody = document.getElementById('listaInventarioBody');
+    if(!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">Chargement de l\'inventaire...</td></tr>';
+    
+    fetch(`${SB_URL}/rest/v1/inventaire?select=*`, {
+        method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    })
+    .then(r => r.json())
+    .then(data => {
+        inventarioLocal = data || [];
+        renderizarTablaInventario(inventarioLocal);
+    })
+    .catch(err => {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">Erreur de chargement: ${err.message}</td></tr>`;
+    });
+}
+
+// RENDERIZAR TABLA DE INVENTARIO
+function renderizarTablaInventario(lista) {
+    const tbody = document.getElementById('listaInventarioBody');
+    tbody.innerHTML = '';
+    
+    if(lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">Aucune pièce trouvée.</td></tr>';
+        return;
+    }
+    
+    lista.forEach(item => {
+        const stock = parseInt(item.quantite_stock) || 0;
+        const min = parseInt(item.stock_minimum) || 0;
+        const costo = parseFloat(item.prix_cout) || 0;
+        const venta = parseFloat(item.prix_vente) || 0;
+        
+        // Alerta visual: si el stock es menor o igual al mínimo, se pinta la fila con un fondo rojo suave
+        const alertaEstilo = stock <= min ? 'background-color: #fef2f2; color: #991b1b;' : '';
+        const badgeAlerta = stock <= min ? '<span style="background: #fca5a5; color: #7f1d1d; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px;">BAS</span>' : '';
+
+        const tr = document.createElement('tr');
+        tr.style.cssText = alertaEstilo;
+        tr.innerHTML = `
+            <td style="padding:12px; font-weight:bold;">${item.id}</td>
+            <td style="padding:12px; font-weight: 600;">${item.nom_piece}</td>
+            <td style="padding:12px; text-align:center; font-weight: bold;">${stock} ${badgeAlerta}</td>
+            <td style="padding:12px; text-align:center; color: #64748b;">${min}</td>
+            <td style="padding:12px; text-align:right;">$${costo.toFixed(2)}</td>
+            <td style="padding:12px; text-align:right; font-weight:bold; color:#0f172a;">$${venta.toFixed(2)}</td>
+            <td style="padding:12px; text-align:center;">
+                <button style="padding: 4px 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="modificarStock('${item.id}', 1)">➕</button>
+                <button style="padding: 4px 8px; background: #eab308; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="modificarStock('${item.id}', -1)">➖</button>
+                <button style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="eliminarPiezaInventario('${item.id}', '${item.nom_piece}')">🗑️</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// GUARDAR NUEVA PIEZA EN SUPABASE (Asegura compatibilidad con tu ID autonumérico o bigint)
+async function guardarInventarioReal(event) {
+    event.preventDefault();
+    
+    const nom = document.getElementById('invNom').value.trim();
+    const stock = parseInt(document.getElementById('invStock').value) || 0;
+    const min = parseInt(document.getElementById('invMin').value) || 0;
+    const cout = parseFloat(document.getElementById('invCout').value) || 0;
+    const vente = parseFloat(document.getElementById('invVente').value) || 0;
+
+    const nuevaPieza = {
+        nom_piece: nom,
+        quantite_stock: stock,
+        stock_minimum: min,
+        prix_cout: cout,
+        prix_vente: vente
+    };
+
+    try {
+        const response = await fetch(`${SB_URL}/rest/v1/inventaire`, {
+            method: 'POST',
+            headers: { 
+                'apikey': SB_KEY, 
+                'Authorization': `Bearer ${SB_KEY}`, 
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(nuevaPieza)
+        });
+
+        if (!response.ok) throw new Error("Erreur d'insertion dans Supabase.");
+
+        document.getElementById('formInventaire').reset();
+        cargarInventarioDesdeSupabase();
+    } catch (err) {
+        alert(`Erreur: ${err.message}`);
+    }
+}
+
+// MODIFICAR STOCK (Aumentar o disminuir de uno en uno con un solo clic)
+async function modificarStock(id, cantidadCambio) {
+    const pieza = inventarioLocal.find(item => String(item.id) === String(id));
+    if(!pieza) return;
+
+    const nuevoStock = Math.max(0, (parseInt(pieza.quantite_stock) || 0) + cantidadCambio);
+
+    try {
+        const response = await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: { 
+                'apikey': SB_KEY, 
+                'Authorization': `Bearer ${SB_KEY}`, 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({ quantite_stock: nuevoStock })
+        });
+
+        if (!response.ok) throw new Error("Impossible de mettre à jour le stock.");
+        
+        cargarInventarioDesdeSupabase();
+    } catch (err) {
+        alert(`Erreur: ${err.message}`);
+    }
+}
+
+// ELIMINAR PIEZA DE INVENTARIO
+async function eliminarPiezaInventario(id, nombre) {
+    const confirmar = confirm(`Êtes-vous sûr de vouloir supprimer "${nombre}" de l'inventaire ?`);
+    if(!confirmar) return;
+
+    try {
+        const response = await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+
+        if (!response.ok) throw new Error("Erreur lors de la suppression de la pièce.");
+        
+        cargarInventarioDesdeSupabase();
+    } catch (err) {
+        alert(`Erreur: ${err.message}`);
+    }
+}
+
+// FILTRAR INVENTARIO EN VIVO (Buscador)
+function filtrarInventario() {
+    const query = document.getElementById('buscadorInventario').value.toLowerCase().trim();
+    if(!query) {
+        renderizarTablaInventario(inventarioLocal);
+        return;
+    }
+    
+    const filtrados = inventarioLocal.filter(item => 
+        item.nom_piece.toLowerCase().includes(query) || 
+        String(item.id).toLowerCase().includes(query)
+    );
+    renderizarTablaInventario(filtrados);
+}
+
+// CERRAR MODAL
 function cerrarModal() { 
     document.getElementById('modalFactura').style.display = 'none'; 
 }
 
-// Imprimir
+// IMPRIMIR
 function imprimirContenidoModal() { 
     const c = document.getElementById('modalCuerpoFactura').innerHTML; 
     const w = window.open('', '_blank'); 
