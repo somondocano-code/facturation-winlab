@@ -8,23 +8,12 @@ const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
 let facturaActiva = null;
 let inventarioLocal = [];
 
-// FUNCIÓN DE SEGURIDAD (LOGIN)
-function verificarPassword(event) {
-    event.preventDefault();
-    const passwordInput = document.getElementById('adminPassword').value;
-    const errorMsg = document.getElementById('loginError');
-    
-    if (passwordInput === "Winlab2026") { 
-        document.getElementById('loginScreen').style.cssText = "display: none !important;";
-        document.getElementById('appContainer').style.display = 'block';
-        inicializarSistema();
-    } else {
-        errorMsg.style.display = 'block';
-        document.getElementById('adminPassword').value = "";
-    }
-}
+// INICIALIZACIÓN AUTOMÁTICA AL CARGAR LA PÁGINA (SIN CONTRASEÑA)
+window.addEventListener('DOMContentLoaded', () => {
+    inicializarSistema();
+});
 
-// Al desbloquear, cargamos primero el inventario para poder usarlo en las facturas
+// Al cargar, se conecta a Supabase y prepara el inventario para las facturas
 async function inicializarSistema() {
     await cargarInventarioDesdeSupabase();
     reestablecerFormularioFactura();
