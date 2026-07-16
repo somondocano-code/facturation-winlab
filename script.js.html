@@ -8,12 +8,27 @@ const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
 let facturaActiva = null;
 let inventarioLocal = [];
 
-// INICIALIZACIÓN AUTOMÁTICA AL CARGAR LA PÁGINA (SIN CONTRASEÑA)
-window.addEventListener('DOMContentLoaded', () => {
-    inicializarSistema();
-});
+// FUNCIÓN DE SEGURIDAD (LOGIN INSTANTÁNEO)
+function verificarPassword(event) {
+    event.preventDefault();
+    const passwordInput = document.getElementById('adminPassword').value;
+    const errorMsg = document.getElementById('loginError');
+    
+    // Contraseña establecida en Winlab2026
+    if (passwordInput === "Winlab2026") { 
+        // 1. Ocultar pantalla de login de inmediato para que sea ultra-rápido
+        document.getElementById('loginScreen').style.cssText = "display: none !important;";
+        document.getElementById('appContainer').style.display = 'block';
+        
+        // 2. Cargar datos en segundo plano
+        inicializarSistema();
+    } else {
+        errorMsg.style.display = 'block';
+        document.getElementById('adminPassword').value = "";
+    }
+}
 
-// Al cargar, se conecta a Supabase y prepara el inventario para las facturas
+// Inicialización de datos asíncrona
 async function inicializarSistema() {
     await cargarInventarioDesdeSupabase();
     reestablecerFormularioFactura();
