@@ -8,23 +8,8 @@
 </head>
 <body>
 
-  <!-- PANTALLA DE LOGIN -->
-  <div id="loginScreen" style="display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f172a; justify-content: center; align-items: center; z-index: 10000; font-family: -apple-system, sans-serif;">
-    <div class="card" style="width: 350px; padding: 30px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #1e293b; border: 1px solid #334155; border-radius: 8px;">
-      <h2 style="color: #ffffff; margin-bottom: 10px; font-size: 24px; font-weight: bold;">Atelier Winlab</h2>
-      <p style="color: #94a3b8; font-size: 14px; margin-bottom: 25px;">Saisir le mot de passe pour accéder</p>
-      <form onsubmit="verificarPassword(event)">
-        <div style="margin-bottom: 20px; text-align: left;">
-          <input type="password" id="adminPassword" placeholder="Mot de passe" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #475569; background-color: #0f172a; color: white; font-size: 16px; box-sizing: border-box;" required>
-        </div>
-        <button type="submit" style="width: 100%; padding: 12px; background-color: #10b981; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer;">Déverrouiller 🔓</button>
-      </form>
-      <div id="loginError" style="color: #ef4444; font-size: 13px; margin-top: 15px; display: none; font-weight: 600;">Mot de passe incorrect</div>
-    </div>
-  </div>
-
-  <!-- CONTENEDOR PRINCIPAL -->
-  <div id="appContainer" class="app-container" style="display: none;">
+  <!-- CONTENEDOR PRINCIPAL (AHORA SE MUESTRA DIRECTAMENTE) -->
+  <div id="appContainer" class="app-container" style="display: block;">
     <div class="tab-navigation">
       <button class="nav-btn active" onclick="switchTab('facturacion')">📝 Nouvelle Facture</button>
       <button class="nav-btn" onclick="switchTab('caisse')">📊 Historique & Caisse</button>
@@ -154,7 +139,7 @@
     </div>
   </div>
 
-  <!-- LISTA DE AUTOCOMPLETADO INTELIGENTE (DATALIST) -->
+  <!-- LISTA DE SUGERENCIAS DE DISPOSITIVOS -->
   <datalist id="modelesList">
     <!-- Apple - iPhone -->
     <option value="iPhone 17 Pro Max"></option>
@@ -190,12 +175,7 @@
     <option value="iPhone X"></option>
     <option value="iPhone 8 Plus"></option>
     <option value="iPhone 8"></option>
-    <option value="iPhone 7 Plus"></option>
-    <option value="iPhone 7"></option>
-    <option value="iPhone 6s Plus"></option>
-    <option value="iPhone 6s"></option>
     <option value="iPhone SE (3e gen)"></option>
-    <option value="iPhone SE (2e gen)"></option>
 
     <!-- Apple - iPad -->
     <option value="iPad Pro 13 (M5)"></option>
@@ -207,12 +187,8 @@
     <option value="iPad Air 13 (M4)"></option>
     <option value="iPad Air 11 (M4)"></option>
     <option value="iPad Air (5e gen)"></option>
-    <option value="iPad Air (4e gen)"></option>
     <option value="iPad (10e gen)"></option>
-    <option value="iPad (9e gen)"></option>
     <option value="iPad mini 8"></option>
-    <option value="iPad mini 7"></option>
-    <option value="iPad mini 6"></option>
 
     <!-- Samsung - Série S -->
     <option value="Galaxy S26 Ultra"></option>
@@ -225,57 +201,36 @@
     <option value="Galaxy S24+"></option>
     <option value="Galaxy S24"></option>
     <option value="Galaxy S23 Ultra"></option>
-    <option value="Galaxy S23"></option>
-    <option value="Galaxy S23 FE"></option>
+    <option value="Galaxy S23FE"></option>
     <option value="Galaxy S22 Ultra"></option>
-    <option value="Galaxy S22"></option>
     <option value="Galaxy S21 Ultra"></option>
-    <option value="Galaxy S21"></option>
-    <option value="Galaxy S21 FE"></option>
-    <option value="Galaxy S20 Ultra"></option>
-    <option value="Galaxy S20"></option>
 
-    <!-- Samsung - Pliables -->
+    <!-- Samsung - Pliables & Série A -->
     <option value="Galaxy Z Fold 7"></option>
     <option value="Galaxy Z Flip 7"></option>
     <option value="Galaxy Z Fold 6"></option>
     <option value="Galaxy Z Flip 6"></option>
-    <option value="Galaxy Z Fold 5"></option>
-    <option value="Galaxy Z Flip 5"></option>
-
-    <!-- Samsung - Série A (Populaires) -->
     <option value="Galaxy A57 5G"></option>
     <option value="Galaxy A37 5G"></option>
     <option value="Galaxy A56 5G"></option>
     <option value="Galaxy A55 5G"></option>
     <option value="Galaxy A35 5G"></option>
-    <option value="Galaxy A54 5G"></option>
-    <option value="Galaxy A34 5G"></option>
     <option value="Galaxy A15"></option>
     <option value="Galaxy A14"></option>
-    <option value="Galaxy A13"></option>
-    <option value="Galaxy A03s"></option>
 
     <!-- Google Pixel -->
     <option value="Pixel 10 Pro Fold"></option>
     <option value="Pixel 10 Pro XL"></option>
     <option value="Pixel 10 Pro"></option>
     <option value="Pixel 10"></option>
-    <option value="Pixel 10a"></option>
     <option value="Pixel 9 Pro Fold"></option>
     <option value="Pixel 9 Pro XL"></option>
     <option value="Pixel 9 Pro"></option>
     <option value="Pixel 9"></option>
-    <option value="Pixel 9a"></option>
     <option value="Pixel 8 Pro"></option>
     <option value="Pixel 8"></option>
-    <option value="Pixel 8a"></option>
     <option value="Pixel 7 Pro"></option>
-    <option value="Pixel 7"></option>
-    <option value="Pixel 7a"></option>
     <option value="Pixel 6 Pro"></option>
-    <option value="Pixel 6"></option>
-    <option value="Pixel 6a"></option>
   </datalist>
 
   <!-- MODAL PARA VER FACTURAS -->
@@ -292,5 +247,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
