@@ -8,6 +8,7 @@
 </head>
 <body>
 
+  <!-- PANTALLA DE LOGIN -->
   <div id="loginScreen" style="display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f172a; justify-content: center; align-items: center; z-index: 10000; font-family: -apple-system, sans-serif;">
     <div class="card" style="width: 350px; padding: 30px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #1e293b; border: 1px solid #334155; border-radius: 8px;">
       <h2 style="color: #ffffff; margin-bottom: 10px; font-size: 24px; font-weight: bold;">Atelier Winlab</h2>
@@ -22,6 +23,7 @@
     </div>
   </div>
 
+  <!-- CONTENEDOR PRINCIPAL -->
   <div id="appContainer" class="app-container" style="display: none;">
     <div class="tab-navigation">
       <button class="nav-btn active" onclick="switchTab('facturacion')">📝 Nouvelle Facture</button>
@@ -29,6 +31,7 @@
       <button class="nav-btn" onclick="switchTab('inventarioTab')">📦 Inventaire</button>
     </div>
 
+    <!-- Pestaña de Facturación -->
     <div id="facturacion" class="tab-content">
       <div class="card">
         <div class="card-header">🛠️ Atelier Winlab — Saisie de Facture</div>
@@ -42,11 +45,6 @@
           <div class="form-group">
             <label for="clientCourriel">Courriel du Client :</label>
             <input type="email" id="clientCourriel" placeholder="Ex: client@courriel.com" required>
-          </div>
-
-          <div class="form-group" style="margin-top: 15px;">
-            <label for="clientTelephone">Téléphone du Client :</label>
-            <input type="tel" id="clientTelephone" placeholder="Ex: 4502097144" required>
           </div>
 
           <div style="margin-top: 20px; margin-bottom: 10px;">
@@ -69,7 +67,7 @@
               </div>
             </div>
             
-            <button type="button" class="btn-primary" style="background-color: #007bff; margin-top: 15px; padding: 10px 15px; font-size: 14px;" onclick="agregarFilaReparacion()">➕ Ajouter une autre réparation</button>
+            <button type="button" class="btn-primary" style="background-color: #007bff; margin-top: 15px; padding: 10px 15px; font-size: 14px; width: auto;" onclick="agregarFilaReparacion()">➕ Ajouter une autre réparation</button>
           </div>
 
           <button type="submit" class="submit-btn" style="margin-top: 20px;">💾 Encaisser & Afficher Facture</button>
@@ -77,6 +75,7 @@
       </div>
     </div>
 
+    <!-- Pestaña de Caja e Historial -->
     <div id="caisse" class="tab-content" style="display: none;">
       <div class="stats-grid">
         <div class="stat-card">
@@ -97,19 +96,20 @@
               <tr>
                 <th>Facture</th>
                 <th>Client</th>
-                <th>Téléphone</th>
                 <th>Appareils / Réparations</th>
                 <th>Total</th>
-                <th>Action</th>
+                <th style="text-align: center;">Action</th>
               </tr>
             </thead>
             <tbody id="listaFacturesBody">
-              </tbody>
+              <!-- Cargado dinámico -->
+            </tbody>
           </table>
         </div>
       </div>
     </div>
 
+    <!-- Pestaña de Inventario -->
     <div id="inventarioTab" class="tab-content" style="display: none;">
       <div class="card" style="margin-bottom: 25px;">
         <div class="card-header">📦 Ajouter une pièce / composant</div>
@@ -141,45 +141,47 @@
       </div>
 
       <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
           <span>📋 Liste de l'Inventaire</span>
-          <input type="text" id="buscadorInventario" oninput="filtrarInventario()" placeholder="🔍 Rechercher une pièce..." style="width: 250px; padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 13.5px;">
+          <input type="text" id="buscadorInventario" oninput="filtrarInventario()" placeholder="🔍 Rechercher..." style="width: 100%; max-width: 200px; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;">
         </div>
         <div style="overflow-x: auto;">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Réf (ID)</th>
+                <th>ID</th>
                 <th>Nom de la pièce</th>
                 <th style="text-align: center;">Stock</th>
-                <th style="text-align: center;">Min. Alerte</th>
-                <th style="text-align: right;">Prix Coût</th>
-                <th style="text-align: right;">Prix Vente</th>
+                <th style="text-align: center;">Min</th>
+                <th style="text-align: right;">Coût</th>
+                <th style="text-align: right;">Vente</th>
                 <th style="text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody id="listaInventarioBody">
-              </tbody>
+              <!-- Cargado dinámico -->
+            </tbody>
           </table>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- MODAL PARA VER FACTURAS -->
   <div id="modalFactura" class="modal-overlay" style="display: none;">
     <div class="modal-box">
       <div class="modal-actions-bar">
-        <button class="btn-secondary" onclick="cerrarModal()">❌ Fermer</button>
-        <button class="btn-primary" onclick="descargarFacturaPDF()">📥 Télécharger PDF</button>
+        <button class="btn-secondary" style="background-color: #6c757d; color: white;" onclick="cerrarModal()">❌ Fermer</button>
+        <button class="btn-primary" onclick="descargarFacturaPDF()">📥 PDF</button>
         <button class="btn-primary" style="background-color: #28a745;" onclick="imprimirContenidoModal()">🖨️ Imprimer</button>
       </div>
       <div id="modalCuerpoFactura" class="invoice-print-area">
-        </div>
+        <!-- Contenido -->
+      </div>
     </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
   <script>
     function agregarFilaReparacion() {
         const contenedor = document.getElementById('contenedorReparaciones');
@@ -206,8 +208,6 @@
         boton.parentElement.remove();
     }
   </script>
-
   <script src="script.js"></script>
-
 </body>
 </html>
