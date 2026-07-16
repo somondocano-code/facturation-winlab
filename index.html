@@ -8,8 +8,23 @@
 </head>
 <body>
 
-  <!-- CONTENEDOR PRINCIPAL (AHORA SE MUESTRA DIRECTAMENTE) -->
-  <div id="appContainer" class="app-container" style="display: block;">
+  <!-- PANTALLA DE LOGIN -->
+  <div id="loginScreen" style="display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f172a; justify-content: center; align-items: center; z-index: 10000; font-family: -apple-system, sans-serif;">
+    <div class="card" style="width: 350px; padding: 30px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #1e293b; border: 1px solid #334155; border-radius: 8px;">
+      <h2 style="color: #ffffff; margin-bottom: 10px; font-size: 24px; font-weight: bold;">Atelier Winlab</h2>
+      <p style="color: #94a3b8; font-size: 14px; margin-bottom: 25px;">Saisir le mot de passe pour accéder</p>
+      <form onsubmit="verificarPassword(event)">
+        <div style="margin-bottom: 20px; text-align: left;">
+          <input type="password" id="adminPassword" placeholder="Mot de passe" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #475569; background-color: #0f172a; color: white; font-size: 16px; box-sizing: border-box;" required>
+        </div>
+        <button type="submit" style="width: 100%; padding: 12px; background-color: #10b981; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer;">Déverrouiller 🔓</button>
+      </form>
+      <div id="loginError" style="color: #ef4444; font-size: 13px; margin-top: 15px; display: none; font-weight: 600;">Mot de passe incorrect</div>
+    </div>
+  </div>
+
+  <!-- CONTENEDOR PRINCIPAL (BLOQUEADO POR DEFECTO) -->
+  <div id="appContainer" class="app-container" style="display: none;">
     <div class="tab-navigation">
       <button class="nav-btn active" onclick="switchTab('facturacion')">📝 Nouvelle Facture</button>
       <button class="nav-btn" onclick="switchTab('caisse')">📊 Historique & Caisse</button>
@@ -201,7 +216,7 @@
     <option value="Galaxy S24+"></option>
     <option value="Galaxy S24"></option>
     <option value="Galaxy S23 Ultra"></option>
-    <option value="Galaxy S23FE"></option>
+    <option value="Galaxy S23 FE"></option>
     <option value="Galaxy S22 Ultra"></option>
     <option value="Galaxy S21 Ultra"></option>
 
