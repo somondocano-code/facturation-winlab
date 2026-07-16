@@ -87,7 +87,7 @@ function reestablecerFormularioFactura() {
     agregarFilaReparacion(); // Agrega la primera fila limpia
 }
 
-// AGREGAR FILA DINÁMICA DE REPARACIÓN (CON SELECTOR DE INVENTARIO)
+// AGREGAR FILA DINÁMICA DE REPARACIÓN (CON AUTOCOMPLETADO DE APARATOS Y SELECTOR DE INVENTARIO)
 function agregarFilaReparacion() {
     const contenedor = document.getElementById('contenedorReparaciones');
     const index = contenedor.children.length;
@@ -108,14 +108,13 @@ function agregarFilaReparacion() {
     nuevaFila.innerHTML = `
         <div style="flex: 2; min-width: 150px; display: flex; flex-direction: column; gap: 5px;">
             <label style="font-size: 12px; color: #666;">Appareil :</label>
-            <input type="text" class="item-appareil" placeholder="Ex: iPhone 13 Pro" required>
+            <input type="text" class="item-appareil" placeholder="Ex: iPhone 13 Pro" list="modelesList" required>
         </div>
         <div style="flex: 3; min-width: 200px; display: flex; flex-direction: column; gap: 5px;">
             <label style="font-size: 12px; color: #666;">Type de Réparation / Pièce :</label>
             <select class="item-selector-pieza" onchange="cambiarSeleccionPieza(this)" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; background-color: #f8fafc; height: 46px;">
                 ${opcionesInventario}
             </select>
-            <!-- Entrada de texto manual para cuando se selecciona "Service" -->
             <input type="text" class="item-reparation" placeholder="Ex: Changement d'écran" style="margin-top: 5px;" required>
         </div>
         <div style="flex: 1.5; min-width: 100px; display: flex; flex-direction: column; gap: 5px;">
@@ -147,12 +146,11 @@ function cambiarSeleccionPieza(selectElement) {
         inputPrecio.value = '';
         inputPrecio.readOnly = false;
     } else {
-        // Autocompletamos con la información registrada en el inventario
         const nombrePiezaClean = opcionSeleccionada.text.split(' (Stock:')[0];
         inputReparacion.value = nombrePiezaClean;
-        inputReparacion.style.display = 'none'; // Ocultamos el campo manual para evitar que se altere
+        inputReparacion.style.display = 'none';
         inputPrecio.value = precio.toFixed(2);
-        inputPrecio.readOnly = true; // No modificable si es un repuesto exacto
+        inputPrecio.readOnly = true;
     }
 }
 
@@ -166,7 +164,7 @@ async function guardarFacturaReal(event) {
     const filas = document.querySelectorAll('.fila-reparacion');
     let listaTrabajos = [];
     let prixBaseTotal = 0;
-    let piezasADescontar = []; // Registro de id_pieza y nueva cantidad
+    let piezasADescontar = [];
 
     for (let fila of filas) {
         const app = fila.querySelector('.item-appareil').value.trim();
@@ -177,7 +175,6 @@ async function guardarFacturaReal(event) {
         listaTrabajos.push({ appareil: app, reparation: rep, prix: precio });
         prixBaseTotal += precio;
 
-        // Si se seleccionó una pieza real del inventario, programamos su descuento
         if (selectorPieza !== 'service') {
             const piezaInv = inventarioLocal.find(item => String(item.id) === String(selectorPieza));
             if (piezaInv) {
@@ -195,7 +192,6 @@ async function guardarFacturaReal(event) {
     }
 
     try {
-        // 1. Registrar la Factura en Supabase
         const responseList = await fetch(`${SB_URL}/rest/v1/factures?select=id_facture`, {
             method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
@@ -235,7 +231,7 @@ async function guardarFacturaReal(event) {
 
         if (!responseInsert.ok) throw new Error("Échec d'enregistrement de la facture.");
 
-        // 2. Procesar todos los descuentos de Inventario en lote
+        // Descontar inventario
         for (let desc of piezasADescontar) {
             await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${desc.id}`, {
                 method: 'PATCH',
@@ -248,7 +244,6 @@ async function guardarFacturaReal(event) {
             });
         }
 
-        // 3. Refrescar inventario local y reiniciar formulario
         await cargarInventarioDesdeSupabase();
         reestablecerFormularioFactura();
         
@@ -531,7 +526,7 @@ async function guardarInventarioReal(event) {
 
         document.getElementById('formInventaire').reset();
         await cargarInventarioDesdeSupabase();
-        reestablecerFormularioFactura(); // Refresca las opciones en el formulario de factura
+        reestablecerFormularioFactura();
     } catch (err) {
         alert(`Erreur: ${err.message}`);
     }
@@ -557,7 +552,7 @@ async function modificarStock(id, cantidadCambio) {
         if (!response.ok) throw new Error("Impossible de mettre à jour le stock.");
         
         await cargarInventarioDesdeSupabase();
-        reestablecerFormularioFactura(); // Mantiene sincronizada la pestaña de facturación
+        reestablecerFormularioFactura();
     } catch (err) {
         alert(`Erreur: ${err.message}`);
     }
