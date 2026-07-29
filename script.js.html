@@ -14,13 +14,9 @@ function verificarPassword(event) {
     const passwordInput = document.getElementById('adminPassword').value;
     const errorMsg = document.getElementById('loginError');
     
-    // Contraseña establecida en Winlab2026
     if (passwordInput === "Winlab2026") { 
-        // 1. Ocultar pantalla de login de inmediato para que sea ultra-rápido
         document.getElementById('loginScreen').style.cssText = "display: none !important;";
         document.getElementById('appContainer').style.display = 'block';
-        
-        // 2. Cargar datos en segundo plano
         inicializarSistema();
     } else {
         errorMsg.style.display = 'block';
@@ -28,13 +24,11 @@ function verificarPassword(event) {
     }
 }
 
-// Inicialización de datos asíncrona
 async function inicializarSistema() {
     await cargarInventarioDesdeSupabase();
     reestablecerFormularioFactura();
 }
 
-// Alternar entre pestañas
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
     document.getElementById(tabId).style.display = 'block';
@@ -46,7 +40,6 @@ function switchTab(tabId) {
     if (tabId === 'inventarioTab') cargarInventarioDesdeSupabase();
 }
 
-// ID único para registros
 function generarUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -88,10 +81,10 @@ function reestablecerFormularioFactura() {
     document.getElementById('formFacture').reset();
     const contenedor = document.getElementById('contenedorReparaciones');
     contenedor.innerHTML = '';
-    agregarFilaReparacion(); // Agrega la primera fila limpia
+    agregarFilaReparacion();
 }
 
-// AGREGAR FILA DINÁMICA DE REPARACIÓN (CON AUTOCOMPLETADO DE APARATOS Y SELECTOR DE INVENTARIO)
+// AGREGAR FILA DINÁMICA DE REPARACIÓN
 function agregarFilaReparacion() {
     const contenedor = document.getElementById('contenedorReparaciones');
     const index = contenedor.children.length;
@@ -100,7 +93,6 @@ function agregarFilaReparacion() {
     nuevaFila.className = 'fila-reparacion';
     nuevaFila.style = "display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; flex-wrap: wrap;";
     
-    // Generar opciones del inventario
     let opcionesInventario = `<option value="service" data-precio="0">🛠️ Service / Main d'œuvre (Manuel)</option>`;
     inventarioLocal.forEach(item => {
         const stock = parseInt(item.quantite_stock) || 0;
@@ -135,7 +127,6 @@ function eliminarFilaReparacion(boton) {
     boton.parentElement.remove();
 }
 
-// AL CAMBIAR LA PIEZA SE AUTOCOMPLETA EL PRECIO Y EL NOMBRE
 function cambiarSeleccionPieza(selectElement) {
     const fila = selectElement.parentElement.parentElement;
     const opcionSeleccionada = selectElement.options[selectElement.selectedIndex];
@@ -158,12 +149,13 @@ function cambiarSeleccionPieza(selectElement) {
     }
 }
 
-// GUARDAR FACTURA REAL EN SUPABASE (Y DISMINUIR STOCK SI APLICA)
+// GUARDAR FACTURA EN SUPABASE (CON TELÉFONO Y CORREO OPCIONALES)
 async function guardarFacturaReal(event) {
     event.preventDefault();
 
     const nom = document.getElementById('clientNom').value.trim();
     const courriel = document.getElementById('clientCourriel').value.trim();
+    const telephone = document.getElementById('clientTelephone').value.trim();
     
     const filas = document.querySelectorAll('.fila-reparacion');
     let listaTrabajos = [];
@@ -217,7 +209,8 @@ async function guardarFacturaReal(event) {
             id_facture: numeroFacture, 
             id_ticket: "WIN-" + Math.floor(1000 + Math.random() * 9000),
             client_nom: nom, 
-            client_courriel: courriel,
+            client_courriel: courriel || null,
+            client_telephone: telephone || null,
             appareil: resumenAppareils, 
             reparation: resumenReparations,
             prix_base: prixBaseTotal, 
@@ -256,6 +249,7 @@ async function guardarFacturaReal(event) {
             date: new Date().toLocaleDateString('fr-CA'),
             client_nom: nom,
             client_courriel: courriel,
+            client_telephone: telephone,
             trabajos: listaTrabajos,
             prix_base: prixBaseTotal.toFixed(2),
             tps: tps.toFixed(2),
@@ -270,7 +264,7 @@ async function guardarFacturaReal(event) {
     }
 }
 
-// INJECTAR DISEÑO DE FACTURA
+// INYECTAR DISEÑO DE FACTURA (CON DETALLES DE CLIENTE FLEXIBLES)
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
     let filasHtml = '';
@@ -294,6 +288,15 @@ function mostrarFacturaEnModal(facture) {
                 </td>
                 <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: #0f172a; font-size: 13px; vertical-align: top;">$${facture.prix_base}</td>
             </tr>`;
+    }
+
+    // Datos opcionales del cliente
+    let detallesClienteHtml = `<strong>Client:</strong> ${facture.client_nom}`;
+    if (facture.client_telephone || facture.telephone) {
+        detallesClienteHtml += `<br><strong>Tél:</strong> ${facture.client_telephone || facture.telephone}`;
+    }
+    if (facture.client_courriel || facture.courriel || facture.correo) {
+        detallesClienteHtml += `<br><strong>Courriel:</strong> ${facture.client_courriel || facture.courriel || facture.correo}`;
     }
 
     modalCuerpo.innerHTML = `
@@ -335,12 +338,12 @@ function mostrarFacturaEnModal(facture) {
                 </div>
                 <div style="margin-bottom: 12px; font-size: 11px; display: flex; justify-content: space-between; background: #f8fafc; padding: 6px 10px; border-radius: 4px; border: 1px solid #e2e8f0;">
                     <div><strong>Facture N°:</strong> ${facture.id_facture}<br><strong>Date:</strong> ${facture.date}</div>
-                    <div style="text-align: right;"><strong>Client:</strong> ${facture.client_nom}<br><strong>Courriel:</strong> ${facture.client_courriel || facture.correo}</div>
+                    <div style="text-align: right;">${detallesClienteHtml}</div>
                 </div>
                 <table style="width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 11.5px;">
                     <thead>
                         <tr style="background: #0f172a; color: #ffffff;">
-                            <th style="padding: 4px 10px; text-align: left; font-weight: 600;">Description de la reparación</th>
+                            <th style="padding: 4px 10px; text-align: left; font-weight: 600;">Description de la réparation</th>
                             <th style="padding: 4px 10px; text-align: right; font-weight: 600;">Montant</th>
                         </tr>
                     </thead>
@@ -365,7 +368,6 @@ function mostrarFacturaEnModal(facture) {
     document.getElementById('modalFactura').style.display = 'flex';
 }
 
-// CARGAR HISTORIAL DE FACTURAS
 function cargarFacturesDesdeSupabase() {
     const tbody = document.getElementById('listaFacturesBody');
     if(!tbody) return;
@@ -441,9 +443,8 @@ function reimprimirFactureDesdeDatos(fac) {
     mostrarFacturaEnModal(facturaFormateada);
 }
 
-
 // =========================================================================
-// LÓGICA DE INVENTARIO (CONECTADA A LAS COLUMNAS EXISTENTES DE SUPABASE)
+// LÓGICA DE INVENTARIO
 // =========================================================================
 
 async function cargarInventarioDesdeSupabase() {
