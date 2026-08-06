@@ -48,7 +48,7 @@ function generarUUID() {
     });
 }
 
-// IMPRIMIR / GUARDAR PDF SIN DEPENDER DE LIBRERÍAS EXTERNAS
+// GENERAR / IMPRIMIR PDF NATIVO (COMPATIBLE CON MÓVILES Y COMPUTADORAS)
 function descargarFacturaPDF() {
     if (!facturaActiva) {
         alert("Aucune facture active à imprimer ou télécharger.");
@@ -61,32 +61,8 @@ function descargarFacturaPDF() {
         return;
     }
 
-    const ventanaImpresion = window.open('', '_blank', 'width=800,height=900');
-    ventanaImpresion.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Facture_${facturaActiva.id_facture}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; color: #1e293b; }
-                @media print {
-                    @page { margin: 10mm; size: A4; }
-                    body { margin: 0; }
-                }
-            </style>
-        </head>
-        <body>
-            ${elemento.innerHTML}
-            <script>
-                window.onload = function() {
-                    window.print();
-                    setTimeout(function() { window.close(); }, 500);
-                };
-            </script>
-        </body>
-        </html>
-    `);
-    ventanaImpresion.document.close();
+    // Dispara el visor nativo del sistema para "Guardar como PDF" o Imprimir
+    window.print();
 }
 
 function reestablecerFormularioFactura() {
