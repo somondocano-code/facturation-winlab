@@ -89,7 +89,7 @@ async function descargarFacturaPDF() {
     }
 }
 
-// RESTABLECER FORMULARIO
+// RESTABLECER FORMULARIO DE FACTURA
 function reestablecerFormularioFactura() {
     const form = document.getElementById('formFacture');
     if (form) form.reset();
@@ -326,7 +326,7 @@ async function guardarFacturaReal(event) {
     }
 }
 
-// MOSTRAR FACTURA EN MODAL (CON LOGO Y MARCA DE AGUA logo.jpg)
+// MOSTRAR FACTURA EN MODAL (USANDO logo.png)
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
     if (!modalCuerpo) return;
@@ -366,14 +366,14 @@ function mostrarFacturaEnModal(facture) {
         <div style="position: relative; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.35; padding: 25px; background-color: #ffffff; box-sizing: border-box; width: 100%; max-width: 680px; margin: 0 auto; min-height: 480px; height: auto; border-radius: 8px;">
             
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; user-select: none; pointer-events: none; z-index: 1; opacity: 0.08; width: 85%; text-align: center;">
-                <img src="logo.jpg" style="width: 100%; max-width: 480px; height: auto;">
+                <img src="logo.png" style="width: 100%; max-width: 480px; height: auto;">
             </div>
 
             <div style="position: relative; z-index: 2; width: 100%;">
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px;">
                     <div style="display: flex; align-items: center;">
-                        <img src="logo.jpg" alt="Winlab Logo" style="height: 55px; width: auto; max-width: 220px; object-fit: contain;">
+                        <img src="logo.png" alt="Winlab Logo" style="height: 55px; width: auto; max-width: 220px; object-fit: contain;">
                     </div>
                     <div style="text-align: right; font-size: 9.5px; line-height: 1.35; color: #334155;">
                         <strong style="color: #0f172a; font-size: 11.5px;">Atelier Winlab</strong><br>
@@ -554,3 +554,119 @@ function renderizarTablaInventario(lista) {
 
 async function guardarInventarioReal(event) {
     if (event) event.preventDefault();
+    
+    const nom = document.getElementById('invNom')?.value?.trim() || "";
+    const stock = parseInt(document.getElementById('invStock')?.value) || 0;
+    const min = parseInt(document.getElementById('invMin')?.value) || 0;
+    const cout = parseFloat(document.getElementById('invCout')?.value) || 0;
+    const vente = parseFloat(document.getElementById('invVente')?.value) || 0;
+
+    const nuevaPieza = {
+        nom_piece: nom,
+        quantite_stock: stock,
+        stock_minimum: min,
+        prix_cout: cout,
+        prix_vente: vente
+    };
+
+    try {
+        const response = await fetch(`${SB_URL}/rest/v1/inventaire`, {
+            method: 'POST',
+            headers: { 
+                'apikey': SB_KEY, 
+                'Authorization': `Bearer ${SB_KEY}`, 
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(nuevaPieza)
+        });
+
+        if (!response.ok) throw new Error("Erreur d'insertion dans Supabase.");
+
+        const formInv = document.getElementById('formInventaire');
+        if (formInv) formInv.reset();
+
+        await cargarInventarioDesdeSupabase();
+        reestablecerFormularioFactura();
+    } catch (err) {
+        alert(`Erreur: ${err.message}`);
+    }
+}
+
+async function modificarStock(id, cantidadCambio) {
+    const pieza = inventarioLocal.find(item => String(item.id) === String(id));
+    if (!pieza) return;
+
+    const nuevoStock = Math.max(0, (parseInt(pieza.quantite_stock) || 0) + cantidadCambio);
+
+    try {
+        const response = await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: { 
+                'apikey': SB_KEY, 
+                'Authorization': `Bearer ${SB_KEY}`, 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({ quantite_stock: nuevoStock })
+        });
+
+        if (!response.ok) throw new Error("Impossible de mettre à jour le stock.");
+        
+        await cargarInventarioDesdeSupabase();
+        reestablecerFormularioFactura();
+    } catch (err) {
+        alert(`Erreur: ${err.message}`);
+    }
+}
+
+async function eliminarPiezaInventario(id, nombre) {
+    const confirmar = confirm(`Êtes-vous sûr de vouloir supprimer "${nombre}" de l'inventaire ?`);
+    if (!confirmar) return;
+
+    try {
+        const response = await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+
+        if (!response.ok) throw new Error("Erreur lors de la suppression de la pièce.");
+        
+        await cargarInventarioDesdeSupabase();
+        reestablecerFormularioFactura();
+    } catch (err) {
+        alert(`Erreur: ${err.message}`);
+    }
+}
+
+function filtrarInventario() {
+    const inputBuscador = document.getElementById('buscadorInventario');
+    if (!inputBuscador) return;
+
+    const query = inputBuscador.value.toLowerCase().trim();
+    if (!query) {
+        renderizarTablaInventario(inventarioLocal);
+        return;
+    }
+    
+    const filtrados = inventarioLocal.filter(item => 
+        item.nom_piece.toLowerCase().includes(query) || 
+        String(item.id).toLowerCase().includes(query)
+    );
+    renderizarTablaInventario(filtrados);
+}
+
+function cerrarModal() { 
+    const modal = document.getElementById('modalFactura');
+    if (modal) modal.style.display = 'none'; 
+}
+
+function imprimirContenidoModal() { 
+    const modalCuerpo = document.getElementById('modalCuerpoFactura');
+    if (!modalCuerpo) return;
+
+    const c = modalCuerpo.innerHTML; 
+    const w = window.open('', '_blank'); 
+    w.document.write(`<html><body>${c}</body></html>`); 
+    w.document.close();
+    setTimeout(() => { w.print(); w.close(); }, 500);
+}
