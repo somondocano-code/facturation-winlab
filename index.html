@@ -6,50 +6,33 @@
   <title>Administration Winlab</title>
   <link rel="stylesheet" href="style.css">
 
-  <!-- REGLAS DE IMPRESIÓN Y EXPORTACIÓN A PDF -->
+  <!-- LIBRERÍA JSPDF CARGADA DESDE EL INICIO PARA MÓVILES -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <style>
     @media print {
-      body * {
-        visibility: hidden !important;
-      }
-      #modalCuerpoFactura, #modalCuerpoFactura * {
-        visibility: visible !important;
-      }
+      body * { visibility: hidden !important; }
+      #modalCuerpoFactura, #modalCuerpoFactura * { visibility: visible !important; }
       #modalCuerpoFactura {
         position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 10px !important;
-        background: #ffffff !important;
-        color: #000000 !important;
-        box-shadow: none !important;
+        left: 0 !important; top: 0 !important;
+        width: 100% !important; margin: 0 !important; padding: 10px !important;
+        background: #ffffff !important; color: #000000 !important;
       }
-      .modal-overlay, .modal-box {
-        position: static !important;
-        background: transparent !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-      }
-      .modal-actions-bar {
-        display: none !important;
-      }
+      .modal-overlay, .modal-box, .modal-actions-bar { display: none !important; }
     }
   </style>
 </head>
 <body>
 
   <!-- PANTALLA DE LOGIN -->
-  <div id="loginScreen" style="display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f172a; justify-content: center; align-items: center; z-index: 10000; font-family: -apple-system, sans-serif;">
-    <div class="card" style="width: 350px; padding: 30px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #1e293b; border: 1px solid #334155; border-radius: 8px;">
-      <h2 style="color: #ffffff; margin-bottom: 10px; font-size: 24px; font-weight: bold;">Atelier Winlab</h2>
+  <div id="loginScreen" style="display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #0f172a; justify-content: center; align-items: center; z-index: 10000; font-family: sans-serif;">
+    <div class="card" style="width: 350px; padding: 30px; text-align: center; background: #1e293b; border: 1px solid #334155; border-radius: 8px;">
+      <h2 style="color: #ffffff; margin-bottom: 10px;">Atelier Winlab</h2>
       <p style="color: #94a3b8; font-size: 14px; margin-bottom: 25px;">Saisir le mot de passe pour accéder</p>
       <form onsubmit="verificarPassword(event)">
-        <div style="margin-bottom: 20px; text-align: left;">
-          <input type="password" id="adminPassword" placeholder="Mot de passe" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #475569; background-color: #0f172a; color: white; font-size: 16px; box-sizing: border-box;" required>
-        </div>
-        <button type="submit" style="width: 100%; padding: 12px; background-color: #10b981; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer;">Déverrouiller 🔓</button>
+        <input type="password" id="adminPassword" placeholder="Mot de passe" style="width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #475569; background-color: #0f172a; color: white; font-size: 16px; box-sizing: border-box;" required>
+        <button type="submit" style="width: 100%; margin-top: 15px; padding: 12px; background-color: #10b981; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer;">Déverrouiller 🔓</button>
       </form>
       <div id="loginError" style="color: #ef4444; font-size: 13px; margin-top: 15px; display: none; font-weight: 600;">Mot de passe incorrect</div>
     </div>
@@ -68,17 +51,14 @@
       <div class="card">
         <div class="card-header">🛠️ Atelier Winlab — Saisie de Facture</div>
         <form id="formFacture" onsubmit="guardarFacturaReal(event)">
-          
           <div class="form-group">
             <label for="clientNom">Nom du Client :</label>
             <input type="text" id="clientNom" placeholder="Ex: Jean Dupuis" required>
           </div>
-          
           <div class="form-group">
             <label for="clientCourriel">Courriel du Client :</label>
             <input type="email" id="clientCourriel" placeholder="Ex: client@courriel.com">
           </div>
-
           <div class="form-group">
             <label for="clientTelephone">Téléphone du Client :</label>
             <input type="tel" id="clientTelephone" placeholder="Ex: (450) 000-0000">
@@ -86,11 +66,7 @@
 
           <div style="margin-top: 20px; margin-bottom: 10px;">
             <label style="font-size: 15px; color: #007bff; display: block; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; margin-bottom: 15px;">🛠️ Travaux et Réparations</label>
-            
-            <div id="contenedorReparaciones">
-              <!-- Creado dinámicamente -->
-            </div>
-            
+            <div id="contenedorReparaciones"></div>
             <button type="button" class="btn-primary" style="background-color: #007bff; margin-top: 15px; padding: 10px 15px; font-size: 14px; width: auto;" onclick="agregarFilaReparacion()">➕ Ajouter une autre réparation</button>
           </div>
 
@@ -125,9 +101,7 @@
                 <th style="text-align: center;">Action</th>
               </tr>
             </thead>
-            <tbody id="listaFacturesBody">
-              <!-- Creado dinámicamente -->
-            </tbody>
+            <tbody id="listaFacturesBody"></tbody>
           </table>
         </div>
       </div>
@@ -182,9 +156,7 @@
                 <th style="text-align: center;">Actions</th>
               </tr>
             </thead>
-            <tbody id="listaInventarioBody">
-              <!-- Creado dinámicamente -->
-            </tbody>
+            <tbody id="listaInventarioBody"></tbody>
           </table>
         </div>
       </div>
@@ -200,16 +172,14 @@
     <option value="Galaxy S25 Ultra"></option>
   </datalist>
 
-  <!-- MODAL PARA FACTURA -->
+  <!-- MODAL DE VISTA PREVIA -->
   <div id="modalFactura" class="modal-overlay" style="display: none;">
     <div class="modal-box">
       <div class="modal-actions-bar">
         <button class="btn-secondary" style="background-color: #6c757d; color: white;" onclick="cerrarModal()">❌ Fermer</button>
         <button class="btn-primary" onclick="descargarFacturaPDF()">📥 Télécharger la Facture PDF</button>
       </div>
-      <div id="modalCuerpoFactura" class="invoice-print-area">
-        <!-- Contenido dinámico -->
-      </div>
+      <div id="modalCuerpoFactura" class="invoice-print-area"></div>
     </div>
   </div>
 
