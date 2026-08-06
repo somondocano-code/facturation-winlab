@@ -1,6 +1,4 @@
-# Generar el archivo script.js completo y corregido para el usuario
-
-script_js_content = """// =========================================================================
+// =========================================================================
 // SISTEMA ATELIER WINLAB - FACTURACIÓN E INVENTARIO
 // =========================================================================
 
@@ -468,7 +466,7 @@ function reimprimirFactureDesdeDatos(fac) {
             const repTexto = reps[i] || "";
             let precioItem = base / apps.length; 
             if (repTexto.includes('$')) {
-                const extraerPrecio = repTexto.match(/\\$(\\d+\\.\\d+)/);
+                const extraerPrecio = repTexto.match(/\$(\d+\.\d+)/);
                 if (extraerPrecio) precioItem = parseFloat(extraerPrecio[1]);
             }
             listaTrabajosReconstruida.push({
@@ -646,9 +644,3 @@ function cerrarModal() {
     const modal = document.getElementById('modalFactura');
     if (modal) modal.style.display = 'none'; 
 }
-"""
-
-with open("script.js", "w", encoding="utf-8") as f:
-    f.write(script_js_content)
-
-print("Archivo script.js generado exitosamente.")
