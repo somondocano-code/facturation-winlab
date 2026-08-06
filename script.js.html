@@ -48,130 +48,129 @@ function generarUUID() {
     });
 }
 
-// GENERAR PDF DE FACTURA (DIRECTO Y BLINDADO)
+// GENERAR PDF DE FACTURA (DIRECTO CON JSPDF)
 async function descargarFacturaPDF() {
     if (!facturaActiva) {
         alert("Aucune facture active à télécharger.");
         return;
     }
 
+    // Detectar instancia de jsPDF
     const libJsPDF = window.jspdf ? (window.jspdf.jsPDF || window.jspdf) : window.jsPDF;
 
     if (!libJsPDF) {
-        alert("La bibliothèque PDF n'est pas chargée. Vérifiez l'importation de jsPDF dans index.html.");
+        alert("La bibliothèque PDF n'est pas disponible. Vérifiez que jsPDF est bien chargé dans index.html.");
         return;
     }
 
     try {
         const doc = new libJsPDF();
-        renderizarPDF(doc);
-    } catch (err) {
-        alert("Erreur lors de la génération du PDF: " + err.message);
-    }
-}
 
-function renderizarPDF(doc) {
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
 
-    // 1. ENCABEZADO WINLAB
-    let y = 18;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("WINLAB", 105, y, { align: "center" });
+        // 1. ENCABEZADO FIJO WINLAB
+        let y = 18;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("WINLAB", 105, y, { align: "center" });
 
-    y += 5;
-    doc.setFontSize(8);
-    doc.text("CELLULAIRES ORDINATEURS CONSOLES", 105, y, { align: "center" });
+        y += 5;
+        doc.setFontSize(8);
+        doc.text("CELLULAIRES ORDINATEURS CONSOLES", 105, y, { align: "center" });
 
-    y += 4;
-    doc.setFont("helvetica", "normal");
-    doc.text("Atelier Winlab", 105, y, { align: "center" });
-    y += 4;
-    doc.text("Waterloo, QC, Canada", 105, y, { align: "center" });
-    y += 4;
-    doc.text("Tél: (450) 209-7144", 105, y, { align: "center" });
-    y += 4;
-    doc.text("TPS: 739056695 RT0001 | TVQ: 4008978901 TQ0002", 105, y, { align: "center" });
+        y += 4;
+        doc.setFont("helvetica", "normal");
+        doc.text("Atelier Winlab", 105, y, { align: "center" });
+        y += 4;
+        doc.text("Waterloo, QC, Canada", 105, y, { align: "center" });
+        y += 4;
+        doc.text("Tél: (450) 209-7144", 105, y, { align: "center" });
+        y += 4;
+        doc.text("TPS: 739056695 RT0001 | TVQ: 4008978901 TQ0002", 105, y, { align: "center" });
 
-    // 2. DATOS DE FACTURA
-    y += 10;
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Facture N°: ${facturaActiva.id_facture}`, 15, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.text(`Date: ${facturaActiva.date}`, 15, y);
+        // 2. DATOS DE FACTURA
+        y += 10;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text(`Facture N°: ${facturaActiva.id_facture}`, 15, y);
+        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.text(`Date: ${facturaActiva.date}`, 15, y);
 
-    // 3. TABLA DETALLES
-    y += 10;
-    doc.setFont("helvetica", "bold");
-    doc.text("Description de la réparation", 15, y);
-    doc.text("| Montant", 150, y);
+        // 3. TABLA DE TRABAJOS Y SERVICIOS
+        y += 10;
+        doc.setFont("helvetica", "bold");
+        doc.text("Description de la réparation", 15, y);
+        doc.text("| Montant", 150, y);
 
-    y += 8;
-    doc.setFont("helvetica", "normal");
+        y += 8;
+        doc.setFont("helvetica", "normal");
 
-    if (facturaActiva.trabajos && facturaActiva.trabajos.length > 0) {
-        facturaActiva.trabajos.forEach(t => {
-            doc.text(String(t.appareil || ""), 15, y);
-            doc.text(`| $${parseFloat(t.prix || 0).toFixed(2)}`, 150, y);
-            if (t.reparation) {
+        if (facturaActiva.trabajos && facturaActiva.trabajos.length > 0) {
+            facturaActiva.trabajos.forEach(t => {
+                doc.text(String(t.appareil || ""), 15, y);
+                doc.text(`| $${parseFloat(t.prix || 0).toFixed(2)}`, 150, y);
+                if (t.reparation) {
+                    y += 5;
+                    doc.text(String(t.reparation), 15, y);
+                    doc.text("|", 150, y);
+                }
+                y += 6;
+            });
+        } else {
+            doc.text(String(facturaActiva.appareil || "Service de réparation"), 15, y);
+            doc.text(`| $${parseFloat(facturaActiva.prix_base || 0).toFixed(2)}`, 150, y);
+            if (facturaActiva.reparation) {
                 y += 5;
-                doc.text(String(t.reparation), 15, y);
+                doc.text(String(facturaActiva.reparation), 15, y);
                 doc.text("|", 150, y);
             }
             y += 6;
-        });
-    } else {
-        doc.text(String(facturaActiva.appareil || "Service de réparation"), 15, y);
-        doc.text(`| $${parseFloat(facturaActiva.prix_base || 0).toFixed(2)}`, 150, y);
-        if (facturaActiva.reparation) {
-            y += 5;
-            doc.text(String(facturaActiva.reparation), 15, y);
-            doc.text("|", 150, y);
         }
-        y += 6;
-    }
 
-    // 4. DATOS DEL CLIENTE
-    y += 4;
-    doc.text(`Client: ${facturaActiva.client_nom || 'Client'}`, 15, y);
-    if (facturaActiva.client_telephone) {
+        // 4. DATOS DEL CLIENTE
+        y += 4;
+        doc.text(`Client: ${facturaActiva.client_nom || 'Client'}`, 15, y);
+        if (facturaActiva.client_telephone) {
+            y += 5;
+            doc.text(`Tél: ${facturaActiva.client_telephone}`, 15, y);
+        }
+        if (facturaActiva.client_courriel) {
+            y += 5;
+            doc.text(`Courriel: ${facturaActiva.client_courriel}`, 15, y);
+        }
+
+        // 5. TOTALES E IMPUESTOS
+        y += 10;
+        doc.text("Sous-total:", 15, y);
+        doc.text(`| $${parseFloat(facturaActiva.prix_base || 0).toFixed(2)}`, 150, y);
+
         y += 5;
-        doc.text(`Tél: ${facturaActiva.client_telephone}`, 15, y);
-    }
-    if (facturaActiva.client_courriel) {
+        doc.text("TPS (5%):", 15, y);
+        doc.text(`| $${parseFloat(facturaActiva.tps || 0).toFixed(2)}`, 150, y);
+
         y += 5;
-        doc.text(`Courriel: ${facturaActiva.client_courriel}`, 15, y);
+        doc.text("TVQ (9.975%):", 15, y);
+        doc.text(`| $${parseFloat(facturaActiva.tvq || 0).toFixed(2)}`, 150, y);
+
+        y += 7;
+        doc.setFont("helvetica", "bold");
+        doc.text("Total:", 15, y);
+        doc.text(`| $${parseFloat(facturaActiva.total || 0).toFixed(2)} CAD`, 150, y);
+
+        // 6. PIE DE PÁGINA
+        y += 20;
+        doc.setFont("helvetica", "normal");
+        doc.text("Merci de votre confiance!", 105, y, { align: "center" });
+        doc.text("www.winlab.ca", 105, y + 5, { align: "center" });
+
+        // DESCARGA DIRECTA EN NAVEGADOR
+        doc.save(`Facture_${facturaActiva.id_facture}.pdf`);
+
+    } catch (err) {
+        alert("Erreur lors de la génération du PDF: " + err.message);
     }
-
-    // 5. TOTALES E IMPUESTOS
-    y += 10;
-    doc.text("Sous-total:", 15, y);
-    doc.text(`| $${parseFloat(facturaActiva.prix_base || 0).toFixed(2)}`, 150, y);
-
-    y += 5;
-    doc.text("TPS (5%):", 15, y);
-    doc.text(`| $${parseFloat(facturaActiva.tps || 0).toFixed(2)}`, 150, y);
-
-    y += 5;
-    doc.text("TVQ (9.975%):", 15, y);
-    doc.text(`| $${parseFloat(facturaActiva.tvq || 0).toFixed(2)}`, 150, y);
-
-    y += 7;
-    doc.setFont("helvetica", "bold");
-    doc.text("Total:", 15, y);
-    doc.text(`| $${parseFloat(facturaActiva.total || 0).toFixed(2)} CAD`, 150, y);
-
-    // 6. PIE DE PÁGINA
-    y += 20;
-    doc.setFont("helvetica", "normal");
-    doc.text("Merci de votre confiance!", 105, y, { align: "center" });
-    doc.text("www.winlab.ca", 105, y + 5, { align: "center" });
-
-    // Descarga directa
-    doc.save(`Facture_${facturaActiva.id_facture}.pdf`);
 }
 
 function reestablecerFormularioFactura() {
