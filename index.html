@@ -5,6 +5,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Administration Winlab</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- REGLAS DE IMPRESIÓN / GENERACIÓN DE PDF PARA MÓVILES Y COMPUTADORAS -->
+  <style>
+    @media print {
+      /* Ocultar la app completa, fondos oscuros, navegación y modales */
+      body * {
+        visibility: hidden !important;
+      }
+      
+      /* Hacer visible ÚNICAMENTE el área de la factura */
+      #modalCuerpoFactura, #modalCuerpoFactura * {
+        visibility: visible !important;
+      }
+
+      /* Ajustar la factura al formato de hoja completa limpia */
+      #modalCuerpoFactura {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 10px !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+      }
+
+      /* Anular contenedores oscuros durante la exportación */
+      .modal-overlay, .modal-box {
+        position: static !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+
+      /* Ocultar barra de botones */
+      .modal-actions-bar {
+        display: none !important;
+      }
+    }
+  </style>
 </head>
 <body>
 
@@ -177,7 +218,7 @@
     <div class="modal-box">
       <div class="modal-actions-bar">
         <button class="btn-secondary" style="background-color: #6c757d; color: white;" onclick="cerrarModal()">❌ Fermer</button>
-        <button class="btn-primary" onclick="descargarFacturaPDF()">📥 Imprimer / Enregistrer en PDF</button>
+        <button class="btn-primary" onclick="descargarFacturaPDF()">📥 Enregistrer / Imprimer PDF</button>
       </div>
       <div id="modalCuerpoFactura" class="invoice-print-area">
         <!-- Contenido generado -->
@@ -185,6 +226,7 @@
     </div>
   </div>
 
+  <!-- SCRIPT PRINCIPAL -->
   <script src="script.js"></script>
 </body>
 </html>
