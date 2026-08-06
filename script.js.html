@@ -1,5 +1,5 @@
 // =========================================================================
-// SISTEMA DE FACTURACIÓN E INVENTARIO - ATELIER WINLAB
+// ATELIER WINLAB - FACTURATION ET INVENTAIRE
 // =========================================================================
 
 const SB_URL = 'https://rdsrdclphysffabozqxc.supabase.co';
@@ -8,7 +8,7 @@ const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
 let facturaActiva = null;
 let inventarioLocal = [];
 
-// FUNCIÓN DE AUTENTICACIÓN
+// AUTENTICACIÓN
 function verificarPassword(event) {
     if (event) event.preventDefault();
     const inputPass = document.getElementById('adminPassword');
@@ -35,7 +35,7 @@ async function inicializarSistema() {
     reestablecerFormularioFactura();
 }
 
-// NAVEGACIÓN ENTRE PESTAÑAS
+// CAMBIO DE PESTAÑAS
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
     
@@ -51,7 +51,6 @@ function switchTab(tabId) {
     if (tabId === 'inventarioTab') cargarInventarioDesdeSupabase();
 }
 
-// GENERAR ID ÚNICO
 function generarUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -59,7 +58,7 @@ function generarUUID() {
     });
 }
 
-// DESCARGAR PDF DE LA FACTURA
+// DESCARGAR FACTURA EN PDF
 async function descargarFacturaPDF() {
     if (!facturaActiva) return;
     if (typeof html2pdf === 'undefined') {
@@ -128,7 +127,7 @@ function agregarFilaReparacion() {
         </div>
         <div style="flex: 3; min-width: 200px; display: flex; flex-direction: column; gap: 5px;">
             <label style="font-size: 12px; color: #666;">Type de Réparation / Pièce :</label>
-            <select class="item-selector-pieza" onchange="cambiarSeleccionPieza(this)" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; background-color: #f8fafc; height: 46px;">
+            <select class="item-selector-pieza" onchange="cambiarSeleccionPieza(this)" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 14px; background-color: #f8fafc; height: 42px;">
                 ${opcionesInventario}
             </select>
             <input type="text" class="item-reparation" placeholder="Ex: Changement d'écran" style="margin-top: 5px;" required>
@@ -137,7 +136,7 @@ function agregarFilaReparacion() {
             <label style="font-size: 12px; color: #666;">Prix (CAD) :</label>
             <input type="number" class="item-precio" step="0.01" min="0" placeholder="0.00" required>
         </div>
-        ${index > 0 ? `<button type="button" style="padding: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 38px; font-weight: bold; height: 46px;" onclick="eliminarFilaReparacion(this)">✕</button>` : `<button type="button" style="padding: 10px; background: transparent; border: none; cursor: default; width: 38px; height: 46px;"></button>`}
+        ${index > 0 ? `<button type="button" style="padding: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 38px; font-weight: bold; height: 42px;" onclick="eliminarFilaReparacion(this)">✕</button>` : `<button type="button" style="padding: 10px; background: transparent; border: none; cursor: default; width: 38px; height: 42px;"></button>`}
     `;
     
     contenedor.appendChild(nuevaFila);
@@ -182,17 +181,21 @@ function cambiarSeleccionPieza(selectElement) {
     }
 }
 
-// GUARDAR FACTURA BLINDADO CONTRA ERRORES NULL
+// GUARDAR FACTURA SAFE (NO MÁS ERRORES NULL)
 async function guardarFacturaReal(event) {
     if (event) event.preventDefault();
 
-    // Optional Chaining para evitar el error 'Cannot read properties of null (reading value)'
-    const nom = document.getElementById('clientNom')?.value?.trim() || "";
-    const courriel = document.getElementById('clientCourriel')?.value?.trim() || null;
-    const telephone = document.getElementById('clientTelephone')?.value?.trim() || null;
+    // Uso de optional chaining (?.) para evitar 'reading value of null'
+    const inputNom = document.getElementById('clientNom');
+    const inputTel = document.getElementById('clientTelephone');
+    const inputCourriel = document.getElementById('clientCourriel');
+
+    const nom = inputNom ? inputNom.value.trim() : "";
+    const telephone = (inputTel && inputTel.value.trim() !== "") ? inputTel.value.trim() : null;
+    const courriel = (inputCourriel && inputCourriel.value.trim() !== "") ? inputCourriel.value.trim() : null;
 
     if (!nom) {
-        alert("Attention: Le nom du client est obligatoire.");
+        alert("Veuillez entrer le nom du client.");
         return;
     }
 
@@ -209,13 +212,13 @@ async function guardarFacturaReal(event) {
 
         if (!inputApp || !inputRep || !inputPre) continue;
 
-        const app = inputApp.value?.trim() || "";
-        const rep = inputRep.value?.trim() || "";
+        const app = inputApp.value ? inputApp.value.trim() : "";
+        const rep = inputRep.value ? inputRep.value.trim() : "";
         const precio = parseFloat(inputPre.value) || 0;
         const selectorPieza = inputPie ? inputPie.value : 'service';
 
         if (!app && !rep && precio === 0) continue;
-        
+
         listaTrabajos.push({ appareil: app, reparation: rep, prix: precio });
         prixBaseTotal += precio;
 
@@ -227,10 +230,7 @@ async function guardarFacturaReal(event) {
                     alert(`Erreur: La pièce "${piezaInv.nom_piece}" n'a plus de stock disponible!`);
                     return;
                 }
-                piezasADescontar.push({
-                    id: selectorPieza,
-                    nuevoStock: stockActual - 1
-                });
+                piezasADescontar.push({ id: selectorPieza, nuevoStock: stockActual - 1 });
             }
         }
     }
@@ -242,11 +242,12 @@ async function guardarFacturaReal(event) {
 
     try {
         const responseList = await fetch(`${SB_URL}/rest/v1/factures?select=id_facture`, {
-            method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+            method: 'GET',
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
-        
+
         if (!responseList.ok) throw new Error("Impossible de se connecter à Supabase.");
-        
+
         const todasLesFactures = await responseList.json();
         const totalRegistradas = Array.isArray(todasLesFactures) ? todasLesFactures.length : 0;
         const numeroFacture = `FAC-${String(totalRegistradas + 1).padStart(4, '0')}`;
@@ -259,45 +260,45 @@ async function guardarFacturaReal(event) {
         const resumenReparations = listaTrabajos.map(t => `${t.reparation} ($${t.prix.toFixed(2)})`).join(' | ');
 
         const nuevaFactura = {
-            id: generarUUID(), 
-            id_facture: numeroFacture, 
+            id: generarUUID(),
+            id_facture: numeroFacture,
             id_ticket: "WIN-" + Math.floor(1000 + Math.random() * 9000),
-            client_nom: nom, 
+            client_nom: nom,
             client_courriel: courriel,
             client_telephone: telephone,
-            appareil: resumenAppareils, 
+            appareil: resumenAppareils,
             reparation: resumenReparations,
-            prix_base: prixBaseTotal, 
-            tps: tps, 
-            tvq: tvq, 
-            total: total, 
+            prix_base: prixBaseTotal,
+            tps: tps,
+            tvq: tvq,
+            total: total,
             methode_paiement: 'Interac'
         };
 
         const responseInsert = await fetch(`${SB_URL}/rest/v1/factures`, {
             method: 'POST',
-            headers: { 
-                'apikey': SB_KEY, 
-                'Authorization': `Bearer ${SB_KEY}`, 
-                'Content-Type': 'application/json' 
+            headers: {
+                'apikey': SB_KEY,
+                'Authorization': `Bearer ${SB_KEY}`,
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(nuevaFactura)
         });
 
         if (!responseInsert.ok) {
             const errorDetalle = await responseInsert.text();
-            console.error("Error exacto Supabase:", errorDetalle);
+            console.error("Erreur Supabase:", errorDetalle);
             throw new Error(`Échec d'enregistrement: ${errorDetalle}`);
         }
 
-        // Descontar del inventario
+        // Actualizar inventario
         for (let desc of piezasADescontar) {
             await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${desc.id}`, {
                 method: 'PATCH',
-                headers: { 
-                    'apikey': SB_KEY, 
-                    'Authorization': `Bearer ${SB_KEY}`, 
-                    'Content-Type': 'application/json' 
+                headers: {
+                    'apikey': SB_KEY,
+                    'Authorization': `Bearer ${SB_KEY}`,
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ quantite_stock: desc.nuevoStock })
             });
@@ -305,7 +306,7 @@ async function guardarFacturaReal(event) {
 
         await cargarInventarioDesdeSupabase();
         reestablecerFormularioFactura();
-        
+
         facturaActiva = {
             id_facture: numeroFacture,
             date: new Date().toLocaleDateString('fr-CA'),
@@ -319,7 +320,7 @@ async function guardarFacturaReal(event) {
             total: total.toFixed(2)
         };
 
-        // Despliega el modal y activa la vista previa de la factura
+        // Muestra el modal con la factura
         mostrarFacturaEnModal(facturaActiva);
 
     } catch (error) {
@@ -327,7 +328,7 @@ async function guardarFacturaReal(event) {
     }
 }
 
-// MOSTRAR FACTURA EN MODAL
+// VISTA PREVIA Y MODAL DE FACTURA
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
     if (!modalCuerpo) return;
