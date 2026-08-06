@@ -1,13 +1,20 @@
-// =========================================================================
+# Generar el archivo script.js completo y corregido para el usuario
+
+script_js_content = """// =========================================================================
 // SISTEMA ATELIER WINLAB - FACTURACIÓN E INVENTARIO
 // =========================================================================
 
-// 1. INYECCIÓN DINÁMICA DE LA LIBRERÍA JSPDF (LA SOLUCIÓN DE CODEPEN)
-(function asegurarLibreria() {
+// 1. CARGA DINÁMICA DE LIBRERÍAS GARANTIZADA (html2canvas + jsPDF)
+(function cargarLibreriasPDF() {
+    if (!window.html2canvas) {
+        const s1 = document.createElement('script');
+        s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        document.head.appendChild(s1);
+    }
     if (!window.jspdf) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        document.head.appendChild(script);
+        const s2 = document.createElement('script');
+        s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        document.head.appendChild(s2);
     }
 })();
 
@@ -57,13 +64,49 @@ function generarUUID() {
     });
 }
 
-// FUNCIÓN DE IMPRESIÓN / DESCARGA PDF NATIVA (SIEMPRE FIABLE)
-function descargarFacturaPDF() {
+// FUNCIÓN PARA GENERAR Y DESCARGAR EL ARCHIVO PDF EN CELULARES Y COMPUTADORAS
+async function descargarFacturaPDF() {
     if (!facturaActiva) {
-        alert("Aucune facture active à imprimer ou télécharger.");
+        alert("Aucune facture active à télécharger.");
         return;
     }
-    window.print();
+
+    const elemento = document.getElementById('modalCuerpoFactura');
+    if (!elemento) {
+        alert("Erreur: Le contenu de la facture n'est pas disponible.");
+        return;
+    }
+
+    // Respaldar en window.print si las librerías no han cargado
+    if (!window.html2canvas || !window.jspdf) {
+        window.print();
+        return;
+    }
+
+    try {
+        const canvas = await html2canvas(elemento, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'JPEG', 0, 10, pdfWidth, pdfHeight);
+        
+        const nombreArchivo = `${facturaActiva.id_facture || 'facture'}_winlab.pdf`;
+        pdf.save(nombreArchivo);
+
+    } catch (err) {
+        console.error("Error generando PDF:", err);
+        window.print();
+    }
 }
 
 function reestablecerFormularioFactura() {
@@ -141,7 +184,7 @@ function cambiarSeleccionPieza(selectElement) {
     }
 }
 
-// GUARDAR FACTURA
+// GUARDAR FACTURA EN SUPABASE
 async function guardarFacturaReal(event) {
     if (event) event.preventDefault();
 
@@ -264,7 +307,7 @@ async function guardarFacturaReal(event) {
     }
 }
 
-// RENDEREAR FACTURA HTML
+// RENDEREAR FACTURA EN MODAL
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
     if (!modalCuerpo) return;
@@ -425,7 +468,7 @@ function reimprimirFactureDesdeDatos(fac) {
             const repTexto = reps[i] || "";
             let precioItem = base / apps.length; 
             if (repTexto.includes('$')) {
-                const extraerPrecio = repTexto.match(/\$(\d+\.\d+)/);
+                const extraerPrecio = repTexto.match(/\\$(\\d+\\.\\d+)/);
                 if (extraerPrecio) precioItem = parseFloat(extraerPrecio[1]);
             }
             listaTrabajosReconstruida.push({
@@ -603,3 +646,9 @@ function cerrarModal() {
     const modal = document.getElementById('modalFactura');
     if (modal) modal.style.display = 'none'; 
 }
+"""
+
+with open("script.js", "w", encoding="utf-8") as f:
+    f.write(script_js_content)
+
+print("Archivo script.js generado exitosamente.")
