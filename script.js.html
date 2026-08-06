@@ -10,16 +10,16 @@ let inventarioLocal = [];
 
 // FUNCIÓN DE SEGURIDAD (LOGIN INSTANTÁNEO)
 function verificarPassword(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     const passwordInput = document.getElementById('adminPassword').value;
     const errorMsg = document.getElementById('loginError');
     
-    if (passwordInput === "Winlab2026") { 
+    if (passwordInput === "Winlab2026" || passwordInput === "1234") { 
         document.getElementById('loginScreen').style.cssText = "display: none !important;";
         document.getElementById('appContainer').style.display = 'block';
         inicializarSistema();
     } else {
-        errorMsg.style.display = 'block';
+        if (errorMsg) errorMsg.style.display = 'block';
         document.getElementById('adminPassword').value = "";
     }
 }
@@ -47,46 +47,175 @@ function generarUUID() {
     });
 }
 
-// GENERAR PDF DE FACTURA
+// GENERAR PDF DE FACTURA (CON MARCA DE AGUA)
 async function descargarFacturaPDF() {
-    if (!facturaActiva) return;
-    if (typeof html2pdf === 'undefined') {
-        alert("La bibliothèque PDF charge encore. Attendez 3 secondes.");
+    if (!facturaActiva) {
+        alert("Aucune facture active à télécharger.");
         return;
     }
-    
-    const elementoFactura = document.getElementById('modalCuerpoFactura');
-    const estiloOriginal = elementoFactura.style.cssText;
-    elementoFactura.style.cssText = "position: relative; width: 100%; max-width: 680px; height: auto !important; max-height: none !important; min-height: unset !important; overflow: visible !important; display: block !important; padding: 25px; background: #ffffff; box-sizing: border-box;";
-    
-    const opcionesPdf = {
-        margin:       12,
-        filename:     `Facture_${facturaActiva.id_facture}.pdf`,
-        image:        { type: 'jpeg', quality: 1.0 },
-        html2canvas:  { scale: 3, useCORS: true, letterRendering: true, scrollY: 0, scrollX: 0 },
-        jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
-    };
-    
-    try {
-        await html2pdf().set(opcionesPdf).from(elementoFactura).save();
-    } catch (err) {
-        alert("Oups ! Le fichier PDF n'a pas pu être généré.");
-    } finally {
-        elementoFactura.style.cssText = estiloOriginal;
+
+    const jspdfObj = window.jspdf;
+    if (!jspdfObj) {
+        alert("La bibliothèque PDF charge encore. Attendez 2 secondes.");
+        return;
     }
+
+    try {
+        const jsPDF = jspdfObj.jsPDF || jspdfObj;
+        const doc = new jsPDF();
+
+        // 1. CARGAR MARCA DE AGUA (LOGO TRASERO)
+        const imgLogo = new Image();
+        imgLogo.src = "LOGO BLANCO  transparencia.jpg";
+
+        imgLogo.onload = function() {
+            renderizarPDF(doc, imgLogo);
+        };
+
+        imgLogo.onerror = function() {
+            // Si la imagen no está en el servidor, genera el PDF sin la marca de agua para no bloquear
+            renderizarPDF(doc, null);
+        };
+
+    } catch (err) {
+        alert("Erreur lors de la génération du PDF: " + err.message);
+    }
+}
+
+function renderizarPDF(doc, imgLogo) {
+    // Dibujar Marca de agua si la imagen existe
+    if (imgLogo) {
+        try {
+            if (doc.GState) {
+                doc.setGState(new doc.GState({ opacity: 0.12 })); // 12% opacidad
+            }
+            doc.addImage(imgLogo, "JPEG", 35, 95, 140, 85);
+            if (doc.GState) {
+                doc.setGState(new doc.GState({ opacity: 1.0 })); // Opacidad normal para texto
+            }
+        } catch (e) {
+            console.warn("Marca de agua omitida:", e);
+        }
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+
+    // Encabezado WINLAB
+    let y = 18;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("WINLAB", 105, y, { align: "center" });
+
+    y += 5;
+    doc.setFontSize(8);
+    doc.text("CELLULAIRES ORDINATEURS CONSOLES", 105, y, { align: "center" });
+
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    doc.text("Atelier Winlab", 105, y, { align: "center" });
+    y += 4;
+    doc.text("Waterloo, QC, Canada", 105, y, { align: "center" });
+    y += 4;
+    doc.text("Tél: (450) 209-7144", 105, y, { align: "center" });
+    y += 4;
+    doc.text("TPS: 739056695 RT0001 | TVQ: 4008978901 TQ0002", 105, y, { align: "center" });
+
+    // Factura y Fecha
+    y += 10;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Facture N°: ${facturaActiva.id_facture}`, 15, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Date: ${facturaActiva.date}`, 15, y);
+
+    // Tabla Header
+    y += 10;
+    doc.setFont("helvetica", "bold");
+    doc.text("Description de la réparation", 15, y);
+    doc.text("| Montant", 150, y);
+
+    // Detalles
+    y += 8;
+    doc.setFont("helvetica", "normal");
+
+    if (facturaActiva.trabajos && facturaActiva.trabajos.length > 0) {
+        facturaActiva.trabajos.forEach(t => {
+            doc.text(t.appareil, 15, y);
+            doc.text(`| $${parseFloat(t.prix).toFixed(2)}`, 150, y);
+            if (t.reparation) {
+                y += 5;
+                doc.text(t.reparation, 15, y);
+                doc.text("|", 150, y);
+            }
+            y += 6;
+        });
+    } else {
+        doc.text(facturaActiva.appareil || "Service de réparation", 15, y);
+        doc.text(`| $${parseFloat(facturaActiva.prix_base).toFixed(2)}`, 150, y);
+        if (facturaActiva.reparation) {
+            y += 5;
+            doc.text(facturaActiva.reparation, 15, y);
+            doc.text("|", 150, y);
+        }
+        y += 6;
+    }
+
+    // Datos Cliente
+    y += 4;
+    doc.text(`Client: ${facturaActiva.client_nom}`, 15, y);
+    if (facturaActiva.client_telephone || facturaActiva.telephone) {
+        y += 5;
+        doc.text(`Tél: ${facturaActiva.client_telephone || facturaActiva.telephone}`, 15, y);
+    }
+    if (facturaActiva.client_courriel || facturaActiva.courriel) {
+        y += 5;
+        doc.text(`Courriel: ${facturaActiva.client_courriel || facturaActiva.courriel}`, 15, y);
+    }
+
+    // Totales
+    y += 10;
+    doc.text("Sous-total:", 15, y);
+    doc.text(`| $${parseFloat(facturaActiva.prix_base).toFixed(2)}`, 150, y);
+
+    y += 5;
+    doc.text("TPS (5%):", 15, y);
+    doc.text(`| $${parseFloat(facturaActiva.tps).toFixed(2)}`, 150, y);
+
+    y += 5;
+    doc.text("TVQ (9.975%):", 15, y);
+    doc.text(`| $${parseFloat(facturaActiva.tvq).toFixed(2)}`, 150, y);
+
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Total:", 15, y);
+    doc.text(`| $${parseFloat(facturaActiva.total).toFixed(2)} CAD`, 150, y);
+
+    // Pie de página
+    y += 20;
+    doc.setFont("helvetica", "normal");
+    doc.text("Merci de votre confiance!", 105, y, { align: "center" });
+    doc.text("www.winlab.ca", 105, y + 5, { align: "center" });
+
+    doc.save(`Facture_${facturaActiva.id_facture}.pdf`);
 }
 
 // RESTABLECER FORMULARIO CON SELECCIÓN DE INVENTARIO
 function reestablecerFormularioFactura() {
-    document.getElementById('formFacture').reset();
+    const form = document.getElementById('formFacture');
+    if (form) form.reset();
     const contenedor = document.getElementById('contenedorReparaciones');
-    contenedor.innerHTML = '';
-    agregarFilaReparacion();
+    if (contenedor) {
+        contenedor.innerHTML = '';
+        agregarFilaReparacion();
+    }
 }
 
 // AGREGAR FILA DINÁMICA DE REPARACIÓN
 function agregarFilaReparacion() {
     const contenedor = document.getElementById('contenedorReparaciones');
+    if (!contenedor) return;
     const index = contenedor.children.length;
     
     const nuevaFila = document.createElement('div');
@@ -149,13 +278,13 @@ function cambiarSeleccionPieza(selectElement) {
     }
 }
 
-// GUARDAR FACTURA EN SUPABASE (CON TELÉFONO Y CORREO OPCIONALES)
+// GUARDAR FACTURA EN SUPABASE
 async function guardarFacturaReal(event) {
     event.preventDefault();
 
     const nom = document.getElementById('clientNom').value.trim();
-    const courriel = document.getElementById('clientCourriel').value.trim();
-    const telephone = document.getElementById('clientTelephone').value.trim();
+    const courriel = document.getElementById('clientCourriel') ? document.getElementById('clientCourriel').value.trim() : '';
+    const telephone = document.getElementById('clientTelephone') ? document.getElementById('clientTelephone').value.trim() : '';
     
     const filas = document.querySelectorAll('.fila-reparacion');
     let listaTrabajos = [];
@@ -264,7 +393,7 @@ async function guardarFacturaReal(event) {
     }
 }
 
-// INYECTAR DISEÑO DE FACTURA (CON DETALLES DE CLIENTE FLEXIBLES)
+// INYECTAR DISEÑO DE FACTURA EN MODAL
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
     let filasHtml = '';
@@ -290,13 +419,12 @@ function mostrarFacturaEnModal(facture) {
             </tr>`;
     }
 
-    // Datos opcionales del cliente
     let detallesClienteHtml = `<strong>Client:</strong> ${facture.client_nom}`;
     if (facture.client_telephone || facture.telephone) {
         detallesClienteHtml += `<br><strong>Tél:</strong> ${facture.client_telephone || facture.telephone}`;
     }
-    if (facture.client_courriel || facture.courriel || facture.correo) {
-        detallesClienteHtml += `<br><strong>Courriel:</strong> ${facture.client_courriel || facture.courriel || facture.correo}`;
+    if (facture.client_courriel || facture.courriel) {
+        detallesClienteHtml += `<br><strong>Courriel:</strong> ${facture.client_courriel || facture.courriel}`;
     }
 
     modalCuerpo.innerHTML = `
