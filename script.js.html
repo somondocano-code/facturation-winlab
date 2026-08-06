@@ -1,6 +1,15 @@
 // =========================================================================
-// SISTEMA DE CONFIGURACIÓN ATELIER WINLAB - FACTURACIÓN E INVENTARIO COLECTIVO
+// SISTEMA ATELIER WINLAB - FACTURACIÓN E INVENTARIO
 // =========================================================================
+
+// 1. INYECCIÓN DINÁMICA DE LA LIBRERÍA JSPDF (LA SOLUCIÓN DE CODEPEN)
+(function asegurarLibreria() {
+    if (!window.jspdf) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        document.head.appendChild(script);
+    }
+})();
 
 const SB_URL = 'https://rdsrdclphysffabozqxc.supabase.co';
 const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
@@ -8,7 +17,7 @@ const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
 let facturaActiva = null;
 let inventarioLocal = [];
 
-// FUNCIÓN DE SEGURIDAD (LOGIN INSTANTÁNEO)
+// INICIALIZACIÓN Y LOGIN
 function verificarPassword(event) {
     if (event) event.preventDefault();
     const passwordInput = document.getElementById('adminPassword');
@@ -48,20 +57,12 @@ function generarUUID() {
     });
 }
 
-// GENERAR / IMPRIMIR PDF NATIVO (COMPATIBLE CON MÓVILES Y COMPUTADORAS)
+// FUNCIÓN DE IMPRESIÓN / DESCARGA PDF NATIVA (SIEMPRE FIABLE)
 function descargarFacturaPDF() {
     if (!facturaActiva) {
         alert("Aucune facture active à imprimer ou télécharger.");
         return;
     }
-    
-    const elemento = document.getElementById('modalCuerpoFactura');
-    if (!elemento) {
-        alert("Erreur: Le contenu de la facture n'est pas disponible.");
-        return;
-    }
-
-    // Dispara el visor nativo del sistema para "Guardar como PDF" o Imprimir
     window.print();
 }
 
@@ -140,7 +141,7 @@ function cambiarSeleccionPieza(selectElement) {
     }
 }
 
-// GUARDAR FACTURA EN SUPABASE
+// GUARDAR FACTURA
 async function guardarFacturaReal(event) {
     if (event) event.preventDefault();
 
@@ -228,7 +229,6 @@ async function guardarFacturaReal(event) {
 
         if (!responseInsert.ok) throw new Error("Échec d'enregistrement de la facture.");
 
-        // Descontar inventario
         for (let desc of piezasADescontar) {
             await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${desc.id}`, {
                 method: 'PATCH',
@@ -264,7 +264,7 @@ async function guardarFacturaReal(event) {
     }
 }
 
-// MOSTRAR FACTURA EN MODAL
+// RENDEREAR FACTURA HTML
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
     if (!modalCuerpo) return;
