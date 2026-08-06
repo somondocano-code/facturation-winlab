@@ -1,5 +1,5 @@
 // =========================================================================
-// SISTEMA DE CONFIGURACIÓN ATELIER WINLAB - FACTURACIÓN E INVENTARIO COLECTIVO
+// SISTEMA DE FACTURACIÓN E INVENTARIO - ATELIER WINLAB
 // =========================================================================
 
 const SB_URL = 'https://rdsrdclphysffabozqxc.supabase.co';
@@ -8,17 +8,21 @@ const SB_KEY = 'sb_publishable_RzhWqVUwOTLHNdB90V9eaQ_7-E1Dgwg';
 let facturaActiva = null;
 let inventarioLocal = [];
 
-// FUNCIÓN DE SEGURIDAD
+// FUNCIÓN DE AUTENTICACIÓN
 function verificarPassword(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     const inputPass = document.getElementById('adminPassword');
     const errorMsg = document.getElementById('loginError');
     
     if (!inputPass) return;
 
     if (inputPass.value === "Winlab2026") { 
-        document.getElementById('loginScreen').style.cssText = "display: none !important;";
-        document.getElementById('appContainer').style.display = 'block';
+        const loginScreen = document.getElementById('loginScreen');
+        const appContainer = document.getElementById('appContainer');
+        
+        if (loginScreen) loginScreen.style.cssText = "display: none !important;";
+        if (appContainer) appContainer.style.display = 'block';
+        
         inicializarSistema();
     } else {
         if (errorMsg) errorMsg.style.display = 'block';
@@ -31,6 +35,7 @@ async function inicializarSistema() {
     reestablecerFormularioFactura();
 }
 
+// NAVEGACIÓN ENTRE PESTAÑAS
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
     
@@ -46,6 +51,7 @@ function switchTab(tabId) {
     if (tabId === 'inventarioTab') cargarInventarioDesdeSupabase();
 }
 
+// GENERAR ID ÚNICO
 function generarUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -53,6 +59,7 @@ function generarUUID() {
     });
 }
 
+// DESCARGAR PDF DE LA FACTURA
 async function descargarFacturaPDF() {
     if (!facturaActiva) return;
     if (typeof html2pdf === 'undefined') {
@@ -83,6 +90,7 @@ async function descargarFacturaPDF() {
     }
 }
 
+// RESTABLECER FORMULARIO DE FACTURA
 function reestablecerFormularioFactura() {
     const form = document.getElementById('formFacture');
     if (form) form.reset();
@@ -94,6 +102,7 @@ function reestablecerFormularioFactura() {
     }
 }
 
+// AGREGAR FILA DE REPARACIÓN DINÁMICA
 function agregarFilaReparacion() {
     const contenedor = document.getElementById('contenedorReparaciones');
     if (!contenedor) return;
@@ -141,43 +150,52 @@ function eliminarFilaReparacion(boton) {
 }
 
 function cambiarSeleccionPieza(selectElement) {
-    const fila = selectElement.parentElement.parentElement;
+    if (!selectElement) return;
+    const fila = selectElement.parentElement?.parentElement;
+    if (!fila) return;
+
     const opcionSeleccionada = selectElement.options[selectElement.selectedIndex];
-    const precio = parseFloat(opcionSeleccionada.getAttribute('data-precio')) || 0;
+    const precio = parseFloat(opcionSeleccionada?.getAttribute('data-precio')) || 0;
     
     const inputReparacion = fila.querySelector('.item-reparation');
     const inputPrecio = fila.querySelector('.item-precio');
     
     if (selectElement.value === 'service') {
-        inputReparacion.value = '';
-        inputReparacion.style.display = 'block';
-        inputPrecio.value = '';
-        inputPrecio.readOnly = false;
+        if (inputReparacion) {
+            inputReparacion.value = '';
+            inputReparacion.style.display = 'block';
+        }
+        if (inputPrecio) {
+            inputPrecio.value = '';
+            inputPrecio.readOnly = false;
+        }
     } else {
-        const nombrePiezaClean = opcionSeleccionada.text.split(' (Stock:')[0];
-        inputReparacion.value = nombrePiezaClean;
-        inputReparacion.style.display = 'none';
-        inputPrecio.value = precio.toFixed(2);
-        inputPrecio.readOnly = true;
+        const nombrePiezaClean = opcionSeleccionada?.text?.split(' (Stock:')[0] || '';
+        if (inputReparacion) {
+            inputReparacion.value = nombrePiezaClean;
+            inputReparacion.style.display = 'none';
+        }
+        if (inputPrecio) {
+            inputPrecio.value = precio.toFixed(2);
+            inputPrecio.readOnly = true;
+        }
     }
 }
 
+// GUARDAR FACTURA BLINDADO CONTRA ERRORES NULL
 async function guardarFacturaReal(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
 
-    const inputNom = document.getElementById('clientNom');
-    const inputCourriel = document.getElementById('clientCourriel');
-    const inputTel = document.getElementById('clientTelephone');
+    // Optional Chaining para evitar el error 'Cannot read properties of null (reading value)'
+    const nom = document.getElementById('clientNom')?.value?.trim() || "";
+    const courriel = document.getElementById('clientCourriel')?.value?.trim() || null;
+    const telephone = document.getElementById('clientTelephone')?.value?.trim() || null;
 
-    if (!inputNom) {
-        alert("Error: No se encontró el campo 'clientNom'. Check HTML.");
+    if (!nom) {
+        alert("Attention: Le nom du client est obligatoire.");
         return;
     }
 
-    const nom = inputNom.value.trim();
-    const courriel = (inputCourriel && inputCourriel.value) ? inputCourriel.value.trim() : null;
-    const telephone = (inputTel && inputTel.value) ? inputTel.value.trim() : null;
-    
     const filas = document.querySelectorAll('.fila-reparacion');
     let listaTrabajos = [];
     let prixBaseTotal = 0;
@@ -191,10 +209,12 @@ async function guardarFacturaReal(event) {
 
         if (!inputApp || !inputRep || !inputPre) continue;
 
-        const app = inputApp.value.trim();
-        const rep = inputRep.value.trim();
+        const app = inputApp.value?.trim() || "";
+        const rep = inputRep.value?.trim() || "";
         const precio = parseFloat(inputPre.value) || 0;
         const selectorPieza = inputPie ? inputPie.value : 'service';
+
+        if (!app && !rep && precio === 0) continue;
         
         listaTrabajos.push({ appareil: app, reparation: rep, prix: precio });
         prixBaseTotal += precio;
@@ -215,14 +235,20 @@ async function guardarFacturaReal(event) {
         }
     }
 
+    if (listaTrabajos.length === 0) {
+        alert("Veuillez ajouter au moins un article ou une réparation.");
+        return;
+    }
+
     try {
         const responseList = await fetch(`${SB_URL}/rest/v1/factures?select=id_facture`, {
             method: 'GET', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
-        if (!responseList.ok) throw new Error("Impossible de se connecter à Supabase.");
-        const todasLesFactures = await responseList.json();
         
-        const totalRegistradas = todasLesFactures ? todasLesFactures.length : 0;
+        if (!responseList.ok) throw new Error("Impossible de se connecter à Supabase.");
+        
+        const todasLesFactures = await responseList.json();
+        const totalRegistradas = Array.isArray(todasLesFactures) ? todasLesFactures.length : 0;
         const numeroFacture = `FAC-${String(totalRegistradas + 1).padStart(4, '0')}`;
 
         const tps = Math.round(prixBaseTotal * 0.05 * 100) / 100;
@@ -261,9 +287,10 @@ async function guardarFacturaReal(event) {
         if (!responseInsert.ok) {
             const errorDetalle = await responseInsert.text();
             console.error("Error exacto Supabase:", errorDetalle);
-            throw new Error(`Échec d'enregistrement de la facture. (${errorDetalle})`);
+            throw new Error(`Échec d'enregistrement: ${errorDetalle}`);
         }
 
+        // Descontar del inventario
         for (let desc of piezasADescontar) {
             await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${desc.id}`, {
                 method: 'PATCH',
@@ -292,6 +319,7 @@ async function guardarFacturaReal(event) {
             total: total.toFixed(2)
         };
 
+        // Despliega el modal y activa la vista previa de la factura
         mostrarFacturaEnModal(facturaActiva);
 
     } catch (error) {
@@ -299,6 +327,7 @@ async function guardarFacturaReal(event) {
     }
 }
 
+// MOSTRAR FACTURA EN MODAL
 function mostrarFacturaEnModal(facture) {
     const modalCuerpo = document.getElementById('modalCuerpoFactura');
     if (!modalCuerpo) return;
@@ -483,6 +512,7 @@ function reimprimirFactureDesdeDatos(fac) {
     mostrarFacturaEnModal(facturaFormateada);
 }
 
+// INVENTARIO
 async function cargarInventarioDesdeSupabase() {
     try {
         const r = await fetch(`${SB_URL}/rest/v1/inventaire?select=*`, {
@@ -535,13 +565,13 @@ function renderizarTablaInventario(lista) {
 }
 
 async function guardarInventarioReal(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     
-    const nom = document.getElementById('invNom').value.trim();
-    const stock = parseInt(document.getElementById('invStock').value) || 0;
-    const min = parseInt(document.getElementById('invMin').value) || 0;
-    const cout = parseFloat(document.getElementById('invCout').value) || 0;
-    const vente = parseFloat(document.getElementById('invVente').value) || 0;
+    const nom = document.getElementById('invNom')?.value?.trim() || "";
+    const stock = parseInt(document.getElementById('invStock')?.value) || 0;
+    const min = parseInt(document.getElementById('invMin')?.value) || 0;
+    const cout = parseFloat(document.getElementById('invCout')?.value) || 0;
+    const vente = parseFloat(document.getElementById('invVente')?.value) || 0;
 
     const nuevaPieza = {
         nom_piece: nom,
@@ -565,7 +595,9 @@ async function guardarInventarioReal(event) {
 
         if (!response.ok) throw new Error("Erreur d'insertion dans Supabase.");
 
-        document.getElementById('formInventaire').reset();
+        const formInv = document.getElementById('formInventaire');
+        if (formInv) formInv.reset();
+
         await cargarInventarioDesdeSupabase();
         reestablecerFormularioFactura();
     } catch (err) {
@@ -575,7 +607,7 @@ async function guardarInventarioReal(event) {
 
 async function modificarStock(id, cantidadCambio) {
     const pieza = inventarioLocal.find(item => String(item.id) === String(id));
-    if(!pieza) return;
+    if (!pieza) return;
 
     const nuevoStock = Math.max(0, (parseInt(pieza.quantite_stock) || 0) + cantidadCambio);
 
@@ -601,7 +633,7 @@ async function modificarStock(id, cantidadCambio) {
 
 async function eliminarPiezaInventario(id, nombre) {
     const confirmar = confirm(`Êtes-vous sûr de vouloir supprimer "${nombre}" de l'inventaire ?`);
-    if(!confirmar) return;
+    if (!confirmar) return;
 
     try {
         const response = await fetch(`${SB_URL}/rest/v1/inventaire?id=eq.${id}`, {
@@ -623,7 +655,7 @@ function filtrarInventario() {
     if (!inputBuscador) return;
 
     const query = inputBuscador.value.toLowerCase().trim();
-    if(!query) {
+    if (!query) {
         renderizarTablaInventario(inventarioLocal);
         return;
     }
